@@ -12529,7 +12529,7 @@ var PEMS = {
 
       
       // Section: Danger Zone (Asset Deletion)
-      if (canEditTracking || canEditPhoto || role === 'ADMIN' || !role || role === 'MOD') {
+      if (canEdit || canEditPhoto || role === 'ADMIN' || !role || role === 'MOD') {
         sectionsHtml.push(
           '<div class="asset-detail-section danger-zone-section" id="sectionAssetActions">',
             '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">',

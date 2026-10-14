@@ -12528,29 +12528,6 @@ var PEMS = {
       }
 
       
-      // Section: Danger Zone (Asset Deletion)
-      if (canEdit || canEditPhoto || role === 'ADMIN' || !role || role === 'MOD') {
-        sectionsHtml.push(
-          '<div class="asset-detail-section danger-zone-section" id="sectionAssetActions">',
-            '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">',
-              '<div>',
-                '<div style="font-weight: 700; color: #ef4444; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem;">',
-                  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>',
-                  '<span>Delete Asset Record</span>',
-                '</div>',
-                '<div class="text-xs text-muted" style="margin-top: 0.25rem;">',
-                  'Permanently remove this asset. Works offline (deletes locally immediately, queues sync to Google Sheets).',
-                '</div>',
-              '</div>',
-              '<button type="button" class="btn btn-sm btn-danger-outline" onclick="PEMS.inventory.promptDeleteAsset(\'' + PEMS.users.escapeHtml(f.propNo) + '\', \'' + PEMS.users.escapeHtml(f.article) + '\')">',
-                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>',
-                '<span>Delete Asset</span>',
-              '</button>',
-            '</div>',
-          '</div>'
-        );
-      }
-
       container.innerHTML = sectionsHtml.join('');
 
       // Restore staged document badges if present

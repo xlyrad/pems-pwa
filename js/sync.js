@@ -318,9 +318,24 @@
       // Attach idempotencyKey to payload
       payload.idempotencyKey = key;
 
-      // If mutation has a linked photo blob, load from IndexedDB photos store
-      if (mutation.photoKey && window.PEMS_DB) {
-        const photoEntry = await window.PEMS_DB.getPhotoBlob(mutation.photoKey);
+      // If mutation has linked photo blobs, load from IndexedDB photos store or localStorage
+      const pKeys = (mutation.photoKeys && Array.isArray(mutation.photoKeys))
+        ? mutation.photoKeys
+        : (mutation.photoKey ? [mutation.photoKey] : []);
+
+      for (const pk of pKeys) {
+        if (!pk) continue;
+        let photoEntry = null;
+        if (window.PEMS_DB) {
+          photoEntry = await window.PEMS_DB.getPhotoBlob(pk);
+        }
+        if (!photoEntry && window.localStorage) {
+          const lsKey = 'pems_photo_' + (mutation.payload ? (mutation.payload.propNo || pk) : pk);
+          const lsData = localStorage.getItem(lsKey);
+          if (lsData) {
+            photoEntry = { data: lsData, docType: 'photo', mimeType: 'image/jpeg', fileName: 'photo.jpg' };
+          }
+        }
         if (photoEntry && photoEntry.data) {
           if (action === 'UPDATE_ASSET_TRACKING' || action === 'updateAssetTracking') {
             const docType = photoEntry.docType || 'photo';

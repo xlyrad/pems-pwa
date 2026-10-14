@@ -3026,6 +3026,170 @@
     flex: 1;
     min-width: 260px;
     position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .inv-search-bar .search-input-wrap input#invSearchInput {
+    padding-left: 2.75rem !important;
+    padding-right: 6.8rem !important;
+    height: 38px;
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-md, 8px);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+  }
+
+  .inv-search-bar .search-input-wrap input#invSearchInput:focus {
+    background: rgba(15, 23, 42, 0.9);
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    outline: none;
+  }
+
+  .inv-search-bar .search-icon {
+    position: absolute;
+    left: 0.95rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    z-index: 2;
+  }
+
+  .inv-search-bar .btn-clear-search {
+    position: absolute;
+    right: 5.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 0.2rem 0.4rem;
+    cursor: pointer;
+    z-index: 3;
+    transition: color 0.15s ease;
+  }
+  .inv-search-bar .btn-clear-search:hover {
+    color: var(--text-primary);
+  }
+
+  .inv-search-bar .btn-qr-search {
+    position: absolute;
+    right: 0.35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(99, 102, 241, 0.25));
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    color: #38bdf8;
+    padding: 0.3rem 0.65rem;
+    border-radius: var(--radius-sm, 6px);
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 3;
+    white-space: nowrap;
+  }
+  .inv-search-bar .btn-qr-search:hover {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(99, 102, 241, 0.45));
+    border-color: #38bdf8;
+    color: #fff;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+    transform: translateY(-50%) scale(1.02);
+  }
+
+  /* QR Scanner Modal Styles */
+  .qr-scanner-card {
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6), 0 0 30px rgba(56, 189, 248, 0.15);
+  }
+  .qr-viewport-container {
+    position: relative;
+    border-radius: var(--radius-md, 8px);
+    overflow: hidden;
+    background: #050811;
+    min-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .qr-viewfinder {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 12px;
+    pointer-events: none;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.52);
+    transition: all 0.3s ease;
+  }
+  .qr-viewfinder.qr-found {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35), 0 0 25px rgba(16, 185, 129, 0.8) !important;
+  }
+  .qr-reticle-corner {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-color: #38bdf8;
+    border-style: solid;
+    pointer-events: none;
+    transition: border-color 0.25s ease;
+  }
+  .qr-viewfinder.qr-found .qr-reticle-corner {
+    border-color: #10b981 !important;
+  }
+  .qr-reticle-corner.tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-top-left-radius: 8px; }
+  .qr-reticle-corner.tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-top-right-radius: 8px; }
+  .qr-reticle-corner.bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; border-bottom-left-radius: 8px; }
+  .qr-reticle-corner.br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-bottom-right-radius: 8px; }
+
+  @keyframes qrLaserSweep {
+    0% { top: 8%; opacity: 0.3; }
+    50% { top: 90%; opacity: 1; }
+    100% { top: 8%; opacity: 0.3; }
+  }
+  .qr-laser-line {
+    position: absolute;
+    left: 4%;
+    right: 4%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #38bdf8, #818cf8, transparent);
+    box-shadow: 0 0 10px #38bdf8, 0 0 18px rgba(56, 189, 248, 0.6);
+    animation: qrLaserSweep 2.2s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .qr-viewfinder.qr-found .qr-laser-line {
+    background: linear-gradient(90deg, transparent, #10b981, #34d399, transparent);
+    box-shadow: 0 0 12px #10b981;
+    animation-play-state: paused;
+  }
+  .qr-scan-status-overlay {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    color: #e2e8f0;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    pointer-events: none;
+    z-index: 5;
+    white-space: nowrap;
   }
 
   .inv-stats-meta {
@@ -4399,6 +4563,16 @@
     .inv-search-bar .search-input-wrap {
       min-width: 0;
       width: 100%;
+    }
+
+    .inv-search-bar .btn-qr-search .qr-btn-text {
+      display: none;
+    }
+    .inv-search-bar .search-input-wrap input#invSearchInput {
+      padding-right: 4.8rem !important;
+    }
+    .inv-search-bar .btn-clear-search {
+      right: 3.2rem !important;
     }
 
     .inv-stats-meta {
@@ -6484,6 +6658,21 @@
                 </span>
                 <input type="text" id="invSearchInput" class="form-control form-control-sm" placeholder="Search by Property No, Serial No., PAR No, Receiver, SubPAR..." autocomplete="off">
                 <button type="button" id="btnInvClearSearch" class="btn-clear-search" title="Clear Search" style="display: none;">&times;</button>
+                <button type="button" id="btnInvQrScan" class="btn-qr-search" title="Scan QR Code / Barcode to Search">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+                    <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+                    <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
+                    <circle cx="17.5" cy="6.5" r="1" fill="currentColor"/>
+                    <circle cx="17.5" cy="17.5" r="1" fill="currentColor"/>
+                    <circle cx="6.5" cy="17.5" r="1" fill="currentColor"/>
+                    <line x1="9.5" y1="12" x2="14.5" y2="12"/>
+                    <line x1="12" y1="9.5" x2="12" y2="14.5"/>
+                  </svg>
+                  <span class="qr-btn-text">Scan QR</span>
+                </button>
               </div>
               <div class="inv-stats-meta">
                 <span class="badge badge-outline" id="invRecordCountBadge">0 Records</span>
@@ -7396,6 +7585,72 @@
   </div>
 
   <!-- ===================================================================== -->
+  <!-- 4E-QR. QR & BARCODE INVENTORY SCANNER MODAL -->
+  <!-- ===================================================================== -->
+  <div id="qrScannerModal" class="modal-overlay" style="display: none; z-index: 1060;">
+    <div class="modal-card glass-panel modal-glass-card qr-scanner-card" style="max-width: 500px; width: 92%;">
+      <div class="modal-glass-glow"></div>
+      <div class="modal-header">
+        <div class="modal-header-content">
+          <div class="modal-icon-badge icon-cyan">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+              <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+              <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+              <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+              <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
+              <circle cx="17.5" cy="6.5" r="1" fill="currentColor"/>
+              <circle cx="17.5" cy="17.5" r="1" fill="currentColor"/>
+              <circle cx="6.5" cy="17.5" r="1" fill="currentColor"/>
+              <line x1="9.5" y1="12" x2="14.5" y2="12"/>
+              <line x1="12" y1="9.5" x2="12" y2="14.5"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="modal-title">Scan QR / Barcode</h3>
+            <p class="modal-subtitle">Point camera at equipment sticker, QR tag or barcode</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="PEMS.inventory.closeQrScanner()" aria-label="Close scanner">&times;</button>
+      </div>
+
+      <div class="qr-viewport-container">
+        <video id="qrScannerVideo" autoplay playsinline muted style="width: 100%; max-height: 320px; object-fit: cover;"></video>
+        <canvas id="qrScannerCanvas" style="display: none;"></canvas>
+
+        <!-- Viewfinder Reticle & Laser Sweep Animation -->
+        <div class="qr-viewfinder">
+          <div class="qr-reticle-corner tl"></div>
+          <div class="qr-reticle-corner tr"></div>
+          <div class="qr-reticle-corner bl"></div>
+          <div class="qr-reticle-corner br"></div>
+          <div class="qr-laser-line"></div>
+        </div>
+
+        <div id="qrScannerStatus" class="qr-scan-status-overlay">Align code within box</div>
+        <div id="qrScannerError" class="p-4 text-center text-danger text-xs" style="display: none; position: absolute; z-index: 10; background: rgba(15, 23, 42, 0.95); width: 100%; height: 100%; align-items: center; justify-content: center; flex-direction: column;"></div>
+      </div>
+
+      <div class="modal-actions mt-3" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="PEMS.inventory.closeQrScanner()">
+          <span>Cancel</span>
+        </button>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <input type="file" id="inputQrImageUpload" accept="image/*" style="display: none;" onchange="PEMS.inventory.handleQrImageFile(this)">
+          <button type="button" class="btn btn-outline-cyan btn-sm" onclick="document.getElementById('inputQrImageUpload').click()" title="Select an image file containing a QR or barcode">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>Scan from File</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnSwitchQrCamera" onclick="PEMS.inventory.toggleQrCameraFacing()" title="Flip between front and rear cameras">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+            <span>Switch Camera</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
   <!-- 4G. FULL-SIZE DOCUMENT & IMAGE VIEWER (LIGHTBOX) MODAL -->
   <!-- ===================================================================== -->
   <div id="docViewerModal" class="modal-overlay doc-viewer-overlay" style="display: none; z-index: 2100;" onclick="if(event.target === this) PEMS.modal.close('docViewerModal');">
@@ -7618,6 +7873,7 @@
   <script src="./js/db.js"></script>
   <script src="./js/sync.js"></script>
   <script src="./js/pwa-install.js"></script>
+  <script src="./js/jsQR.js"></script>
 
   <!-- Modular Scripts Include -->
   <script>
@@ -11217,6 +11473,13 @@ var PEMS = {
         });
       }
 
+      const qrScanBtn = document.getElementById('btnInvQrScan');
+      if (qrScanBtn) {
+        qrScanBtn.addEventListener('click', () => {
+          this.openQrScanner();
+        });
+      }
+
       const btnAddNew = document.getElementById('btnInvAddNew');
       if (btnAddNew) {
         btnAddNew.addEventListener('click', () => {
@@ -11229,6 +11492,283 @@ var PEMS = {
           this.load(true);
         });
       }
+    },
+
+    // =========================================================================
+    // QR CODE & BARCODE SCANNER FOR INVENTORY SEARCH
+    // =========================================================================
+
+    openQrScanner() {
+      const video = document.getElementById('qrScannerVideo');
+      const errBox = document.getElementById('qrScannerError');
+      const statusBox = document.getElementById('qrScannerStatus');
+      const reticle = document.querySelector('.qr-viewfinder');
+
+      if (reticle) reticle.classList.remove('qr-found');
+      if (statusBox) statusBox.textContent = 'Align code within box';
+      if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
+
+      this.state.qrScanning = true;
+      this.state.qrFacingMode = this.state.qrFacingMode || 'environment';
+
+      PEMS.modal.open('qrScannerModal');
+      this.startQrStream();
+    },
+
+    startQrStream() {
+      const video = document.getElementById('qrScannerVideo');
+      const errBox = document.getElementById('qrScannerError');
+      if (!video) return;
+
+      // Stop any existing stream
+      if (this.state.qrStream) {
+        this.state.qrStream.getTracks().forEach(t => t.stop());
+        this.state.qrStream = null;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (errBox) {
+          errBox.style.display = 'flex';
+          errBox.innerHTML = 'Camera access is not supported in this browser. Please use the <strong>Scan from File</strong> button below.';
+        }
+        return;
+      }
+
+      const constraints = {
+        video: {
+          facingMode: { ideal: this.state.qrFacingMode || 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      };
+
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then(stream => {
+          this.state.qrStream = stream;
+          video.srcObject = stream;
+          video.setAttribute('playsinline', 'true');
+          video.play().then(() => {
+            this.runQrScanLoop();
+          }).catch(err => {
+            console.warn('Video play error:', err);
+            this.runQrScanLoop();
+          });
+        })
+        .catch(err => {
+          console.warn('QR camera error:', err);
+          if (errBox) {
+            errBox.style.display = 'flex';
+            errBox.innerHTML = 'Unable to access camera: ' + (err.message || 'Permission denied') + '.<br>You can click <strong>Scan from File</strong> to upload a photo of the QR code.';
+          }
+        });
+    },
+
+    runQrScanLoop() {
+      if (!this.state.qrScanning) return;
+
+      const video = document.getElementById('qrScannerVideo');
+      const canvas = document.getElementById('qrScannerCanvas');
+      if (!video || !canvas) return;
+
+      if (video.readyState >= video.HAVE_CURRENT_DATA) {
+        // 1. Try native BarcodeDetector API if available
+        if ('BarcodeDetector' in window) {
+          try {
+            if (!this._barcodeDetector) {
+              this._barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8'] });
+            }
+            this._barcodeDetector.detect(video).then(barcodes => {
+              if (this.state.qrScanning && barcodes && barcodes.length > 0) {
+                this.handleCodeFound(barcodes[0].rawValue);
+                return;
+              }
+              if (this.state.qrScanning) {
+                requestAnimationFrame(() => this.runQrScanLoop());
+              }
+            }).catch(() => {
+              this.fallbackJsQrScan(video, canvas);
+            });
+            return;
+          } catch (e) {
+            // fallback to jsQR
+          }
+        }
+
+        // 2. Fallback to jsQR canvas analysis
+        this.fallbackJsQrScan(video, canvas);
+        return;
+      }
+
+      if (this.state.qrScanning) {
+        requestAnimationFrame(() => this.runQrScanLoop());
+      }
+    },
+
+    fallbackJsQrScan(video, canvas) {
+      if (!this.state.qrScanning) return;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (ctx && window.jsQR && video.videoWidth > 0 && video.videoHeight > 0) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        try {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = window.jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert'
+          });
+          if (code && code.data && code.data.trim()) {
+            this.handleCodeFound(code.data.trim());
+            return;
+          }
+        } catch (e) {
+          // ignore frame read error
+        }
+      }
+
+      if (this.state.qrScanning) {
+        requestAnimationFrame(() => this.runQrScanLoop());
+      }
+    },
+
+    handleCodeFound(rawValue) {
+      if (!this.state.qrScanning || !rawValue) return;
+      this.state.qrScanning = false;
+
+      let cleanCode = String(rawValue).trim();
+      try {
+        if (cleanCode.startsWith('{') && cleanCode.endsWith('}')) {
+          const parsed = JSON.parse(cleanCode);
+          cleanCode = parsed.propertyNo || parsed.propNo || parsed.serialNo || cleanCode;
+        } else if (cleanCode.startsWith('http://') || cleanCode.startsWith('https://')) {
+          const url = new URL(cleanCode);
+          cleanCode = url.searchParams.get('prop') || url.searchParams.get('propertyNo') || url.hash.replace('#', '') || cleanCode;
+        }
+      } catch (e) {}
+
+      cleanCode = String(cleanCode).trim();
+
+      // Audio Beep
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+      } catch (audioErr) {}
+
+      // Reticle feedback
+      const reticle = document.querySelector('.qr-viewfinder');
+      if (reticle) reticle.classList.add('qr-found');
+      const statusBox = document.getElementById('qrScannerStatus');
+      if (statusBox) statusBox.textContent = 'Found: ' + cleanCode;
+
+      setTimeout(() => {
+        this.closeQrScanner();
+
+        const searchInput = document.getElementById('invSearchInput');
+        const clearBtn = document.getElementById('btnInvClearSearch');
+        if (searchInput) {
+          searchInput.value = cleanCode;
+          this.state.searchQuery = cleanCode;
+          if (clearBtn) clearBtn.style.display = 'block';
+          this.filter();
+          searchInput.focus();
+        }
+
+        PEMS.notification.success('QR Code Scanned', 'Searched for: ' + cleanCode);
+
+        // Auto-open asset details if unique match
+        if (this.state.filteredRows && this.state.filteredRows.length === 1) {
+          setTimeout(() => {
+            this.openDetailModal(0);
+          }, 350);
+        }
+      }, 280);
+    },
+
+    handleQrImageFile(input) {
+      if (!input || !input.files || !input.files[0]) return;
+      const file = input.files[0];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+
+          if ('BarcodeDetector' in window) {
+            try {
+              const detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8'] });
+              detector.detect(img).then(barcodes => {
+                if (barcodes && barcodes.length > 0) {
+                  this.handleCodeFound(barcodes[0].rawValue);
+                } else if (window.jsQR) {
+                  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                  const code = window.jsQR(imgData.data, imgData.width, imgData.height);
+                  if (code && code.data) {
+                    this.handleCodeFound(code.data);
+                  } else {
+                    PEMS.notification.warning('QR Not Found', 'Could not detect a QR code or barcode in the selected image.');
+                  }
+                }
+              }).catch(() => {
+                if (window.jsQR) {
+                  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                  const code = window.jsQR(imgData.data, imgData.width, imgData.height);
+                  if (code && code.data) {
+                    this.handleCodeFound(code.data);
+                  } else {
+                    PEMS.notification.warning('QR Not Found', 'Could not detect a QR code in the selected image.');
+                  }
+                }
+              });
+              input.value = '';
+              return;
+            } catch (e) {}
+          }
+
+          if (window.jsQR) {
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = window.jsQR(imgData.data, imgData.width, imgData.height);
+            if (code && code.data) {
+              this.handleCodeFound(code.data);
+            } else {
+              PEMS.notification.warning('QR Not Found', 'Could not detect a QR code in the selected image.');
+            }
+          } else {
+            PEMS.notification.error('Scanner Error', 'QR decoder library not available.');
+          }
+          input.value = '';
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    },
+
+    toggleQrCameraFacing() {
+      this.state.qrFacingMode = (this.state.qrFacingMode === 'user') ? 'environment' : 'user';
+      this.startQrStream();
+    },
+
+    closeQrScanner() {
+      this.state.qrScanning = false;
+      if (this.state.qrStream) {
+        this.state.qrStream.getTracks().forEach(t => t.stop());
+        this.state.qrStream = null;
+      }
+      const video = document.getElementById('qrScannerVideo');
+      if (video) video.srcObject = null;
+      PEMS.modal.close('qrScannerModal');
     },
 
     openAddNewModal() {
@@ -11389,6 +11929,25 @@ var PEMS = {
           'UNVERIFIED', '', '', '', '', '', '', ''
         ];
         this.state.allRows.push(newRow);
+
+        // Mirror to localStorage
+        if (window.localStorage) {
+          try {
+            const cachedRaw = localStorage.getItem('PEMS_UPLOADED_RECORDS');
+            let cached = cachedRaw ? JSON.parse(cachedRaw) : [];
+            cached.push(newRow);
+            localStorage.setItem('PEMS_UPLOADED_RECORDS', JSON.stringify(cached));
+
+            // Also keep an offline creates log
+            const offRaw = localStorage.getItem('PEMS_OFFLINE_SAVED_DATA');
+            let offData = offRaw ? JSON.parse(offRaw) : [];
+            offData.push(localOfflineRecord);
+            localStorage.setItem('PEMS_OFFLINE_SAVED_DATA', JSON.stringify(offData));
+          } catch (lsErr) {
+            console.warn('localStorage offline mirror warning:', lsErr);
+          }
+        }
+
         this.updateCountBadge();
         this.filter();
         this.closeAddNewModal();
@@ -11396,7 +11955,7 @@ var PEMS = {
           window.PEMS_SYNC.refreshQueueStats();
           window.PEMS_SYNC.syncNow();
         }
-        PEMS.notification.success('Asset Saved Locally', 'Asset ' + propertyNo + ' saved offline. Will sync to Google Sheets when online.');
+        PEMS.notification.success('Asset Saved Locally (Offline)', 'Asset ' + propertyNo + ' saved to local storage. It will automatically sync to Google Sheets when online.');
       };
 
       // If browser is offline or no backend URL configured, save offline directly
@@ -11422,16 +11981,17 @@ var PEMS = {
             PEMS.notification.success('Asset Saved', 'Asset ' + propertyNo + ' has been appended to PEMS_Data in your folder.');
             this.load(true);
           } else {
-            const msg = res ? res.message : 'Failed to save record to PEMS_Data.';
-            PEMS.notification.error('Save Error', msg);
+            console.warn('Backend returned unsuccess, saving offline:', res);
+            saveOfflineFirst();
           }
         })
         .catch(err => {
+          console.warn('Network request failed, saving offline:', err);
           PEMS.ui.hideLoading();
           if (saveBtn) {
             saveBtn.disabled = false;
           }
-          PEMS.notification.error('Error', err.message || 'Server request failed.');
+          saveOfflineFirst();
         });
     },
 
@@ -11482,6 +12042,11 @@ var PEMS = {
       } else {
         // Strict RBAC: Standard USER can only view what they have uploaded
         filterUploaderFullName = currentUser ? (currentUser.fullName || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.username) : '';
+      }
+
+      if (!navigator.onLine) {
+        this.loadOfflineFallback('Offline Mode: Displaying saved records from device storage.');
+        return;
       }
 
       const reqPromise = PEMS.api.invoke('getDriveInventoryData', sessionId, this.state.activeSub, filterUploaderFullName);
@@ -11536,6 +12101,13 @@ var PEMS = {
               window.PEMS_DB.saveRecordsBatch(loadedRows, this.state.headers);
             }
 
+            // Mirror in localStorage
+            if (window.localStorage && loadedRows.length > 0) {
+              try {
+                localStorage.setItem('PEMS_UPLOADED_RECORDS', JSON.stringify(loadedRows));
+              } catch (lsErr) {}
+            }
+
             const openSheetBtn = document.getElementById('btnInvOpenSheet');
             if (openSheetBtn) {
               if (isAdmin) {
@@ -11568,70 +12140,99 @@ var PEMS = {
               this.filter();
             }
           } else {
-            this.showEmpty('Error Loading Data', (res ? res.message : 'Could not retrieve spreadsheet from Drive.'));
+            this.loadOfflineFallback('Spreadsheet load failed. Showing local offline data.');
           }
         })
         .catch(err => {
           this.state.isLoading = false;
-          console.error('Inventory load error:', err);
-          const errMsg = (err && err.message) ? err.message : String(err || '');
-          // Check IndexedDB for offline cached records
-          if (window.PEMS_DB) {
-            window.PEMS_DB.getAllRecords().then(cachedDbRecords => {
-              if (cachedDbRecords && cachedDbRecords.length > 0) {
-                console.log('[PEMS DB] Loaded ' + cachedDbRecords.length + ' offline cached records.');
-                this.state.headers = [
-                  "ARTICLE DESCRIPTION", "PROPERTY NO", "GENERAL DESCRIPTION", "SERIAL NO.",
-                  "ACQUISITION COST", "ACQUISITION DATE", "PAR NO", "OFFICE NAME",
-                  "RECEIVER", "SUBPAR", "DATE UPLOAD", "UPLOADED BY", "STATUS",
-                  "EQUIPMENT_PHOTO", "FETS NO", "FETS TO", "UPLOAD_FETS",
-                  "TRANSMITTAL DATE", "UPLOAD_TRANSMITTAL", "REMARKS"
-                ];
-                let offlineRows = cachedDbRecords.map(r => {
-                  return [
-                    r.articleDesc || '', r.propertyNo || '', r.generalDesc || '', r.serialNo || '',
-                    r.acquisitionCost || '0.00', r.acquisitionDate || '', r.parNo || '', r.officeName || '',
-                    r.receiver || '', r.subPar || '', r.dateUpload || '', r.uploadedBy || '', r.status || 'UNVERIFIED',
-                    r.equipmentPhoto || '', r.fetsNo || '', r.fetsTo || '', r.uploadFets || '',
-                    r.transmittalDate || '', r.uploadTransmittal || '', r.remarks || ''
-                  ];
-                });
-                this.state.allRows = offlineRows;
-                this.checkRoleVisibility();
-                this.filter();
-                PEMS.notification.info('Offline Cache Loaded', 'Displaying ' + offlineRows.length + ' asset records from local IndexedDB storage.');
-                return;
-              }
-            }).catch(e => console.warn(e));
-          }
-
-          if (errMsg.includes('is not a function')) {
-            console.warn('Backend function missing on google.script.run, loading fallback data...');
-            const fallbackData = PEMS.api.getMockDriveInventory(this.state.activeSub, filterUploaderFullName);
-            this.state.headers = fallbackData.headers || [];
-            let fallbackRows = fallbackData.rows || [];
-            if (!isAdminOrMod) {
-              const uFullName = (currentUser ? (currentUser.fullName || [currentUser.firstName, currentUser.middleName, currentUser.lastName].filter(Boolean).join(' ') || currentUser.username) : '').toLowerCase().trim();
-              const uFirstLast = (currentUser ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ') : '').toLowerCase().trim();
-              const uUser = (currentUser && currentUser.username ? currentUser.username : '').toLowerCase().trim();
-              const cleanFullName = uFullName.replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
-              const cleanFirstLast = uFirstLast.replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
-              fallbackRows = fallbackRows.filter(row => {
-                const f = this.getRowFields(row);
-                const rawU = String(f.uploadedBy || '').trim().toLowerCase();
-                if (!rawU) return false;
-                const cleanU = rawU.replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
-                return (cleanFullName && (cleanU === cleanFullName || cleanU.includes(cleanFullName) || cleanFullName.includes(cleanU))) ||
-                       (cleanFirstLast && (cleanU === cleanFirstLast || cleanU.includes(cleanFirstLast) || cleanFirstLast.includes(cleanU))) ||
-                       (uUser && (cleanU === uUser || cleanU.includes(uUser) || uUser.includes(cleanU)));
-              });
-            }
-            this.state.allRows = fallbackRows;
-            this.filter();
-          } else {
-            this.showEmpty('Drive Connection Error', errMsg || 'Failed to communicate with Google Drive.');
-          }
+          console.warn('Inventory fetch failed, loading offline storage:', err);
+          this.loadOfflineFallback('Network disconnected. Displaying saved records from device storage.');
         });
+    },
+
+    async loadOfflineFallback(noticeMessage) {
+      this.state.isLoading = false;
+      const currentUser = PEMS.state.user || PEMS.session.getUser();
+      const role = currentUser ? String(currentUser.role || '').toUpperCase() : 'USER';
+      const isAdminOrMod = (role === 'ADMIN' || role === 'MOD');
+
+      this.state.headers = [
+        "ARTICLE DESCRIPTION", "PROPERTY NO", "GENERAL DESCRIPTION", "SERIAL NO.",
+        "ACQUISITION COST", "ACQUISITION DATE", "PAR NO", "OFFICE NAME",
+        "RECEIVER", "SUBPAR", "DATE UPLOAD", "UPLOADED BY", "STATUS",
+        "EQUIPMENT_PHOTO", "FETS NO", "FETS TO", "UPLOAD_FETS",
+        "TRANSMITTAL DATE", "UPLOAD_TRANSMITTAL", "REMARKS"
+      ];
+
+      let offlineRows = [];
+
+      // 1. Try loading from IndexedDB records store
+      if (window.PEMS_DB) {
+        try {
+          const cachedDbRecords = await window.PEMS_DB.getAllRecords();
+          if (cachedDbRecords && cachedDbRecords.length > 0) {
+            offlineRows = cachedDbRecords.map(r => {
+              let photo = r.equipmentPhoto || '';
+              if (!photo && window.localStorage) {
+                photo = localStorage.getItem('pems_photo_' + (r.propertyNo || '')) || '';
+              }
+              return [
+                r.articleDesc || '', r.propertyNo || '', r.generalDesc || '', r.serialNo || '',
+                r.acquisitionCost || '0.00', r.acquisitionDate || '', r.parNo || '', r.officeName || '',
+                r.receiver || '', r.subPar || '', r.dateUpload || '', r.uploadedBy || '', r.status || 'UNVERIFIED',
+                photo, r.fetsNo || '', r.fetsTo || '', r.uploadFets || '',
+                r.transmittalDate || '', r.uploadTransmittal || '', r.remarks || ''
+              ];
+            });
+          }
+        } catch (e) {
+          console.warn('[PEMS DB] Error reading offline records:', e);
+        }
+      }
+
+      // 2. If IndexedDB had no records, try localStorage fallback
+      if (offlineRows.length === 0 && window.localStorage) {
+        try {
+          const raw = localStorage.getItem('PEMS_UPLOADED_RECORDS');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              offlineRows = parsed;
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 3. Client-side RBAC for non-admin users
+      if (!isAdminOrMod && offlineRows.length > 0) {
+        const uFullName = (currentUser ? (currentUser.fullName || [currentUser.firstName, currentUser.middleName, currentUser.lastName].filter(Boolean).join(' ') || currentUser.username) : '').toLowerCase().trim();
+        const uFirstLast = (currentUser ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ') : '').toLowerCase().trim();
+        const uUser = (currentUser && currentUser.username ? currentUser.username : '').toLowerCase().trim();
+        const cleanFullName = uFullName.replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+        const cleanFirstLast = uFirstLast.replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+
+        offlineRows = offlineRows.filter(row => {
+          const f = this.getRowFields(row);
+          const rawU = String(f.uploadedBy || '').trim().toLowerCase();
+          if (!rawU) return false;
+          const cleanU = rawU.replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+          return (cleanFullName && (cleanU === cleanFullName || cleanU.includes(cleanFullName) || cleanFullName.includes(cleanU))) ||
+                 (cleanFirstLast && (cleanU === cleanFirstLast || cleanU.includes(cleanFirstLast) || cleanFirstLast.includes(cleanU))) ||
+                 (uUser && (cleanU === uUser || cleanU.includes(uUser) || uUser.includes(cleanU)));
+        });
+      }
+
+      this.state.allRows = offlineRows;
+      this.checkRoleVisibility();
+
+      if (offlineRows.length === 0) {
+        this.showEmpty('Offline: No Saved Records Found', 'No cached inventory records were found on this device. Connect to the internet once to synchronize records.');
+      } else {
+        this.filter();
+        if (noticeMessage) {
+          PEMS.notification.info('Offline Mode', noticeMessage);
+        }
+      }
     },
 
     getRowFields(row) {
@@ -12835,6 +13436,201 @@ var PEMS = {
       if (remStatusEl) remStatusEl.textContent = 'Saving remarks...';
       if (photoStatusEl) photoStatusEl.textContent = 'Saving photo...';
 
+      // Robust offline-first local persistence helper
+      const saveOfflineLocal = async () => {
+        try {
+          const safeProp = String(f.propNo || 'ASSET').replace(/[^A-Z0-9]/gi, '_');
+          const photoKey = stagedPhoto ? ('photo_' + safeProp + '_' + Date.now()) : null;
+          const fetsKey = stagedFets ? ('fets_' + safeProp + '_' + Date.now()) : null;
+          const transmittalKey = stagedTransmittal ? ('transmittal_' + safeProp + '_' + Date.now()) : null;
+
+          // 1. Save photo and document blobs to IndexedDB photos store
+          if (window.PEMS_DB) {
+            if (stagedPhoto && photoKey) {
+              await window.PEMS_DB.savePhotoBlob(photoKey, stagedPhoto.dataUrl, {
+                propertyNo: f.propNo,
+                docType: 'photo',
+                mimeType: stagedPhoto.mimeType,
+                fileName: stagedPhoto.fileName,
+                fileSize: stagedPhoto.fileSize
+              });
+            }
+            if (stagedFets && fetsKey) {
+              await window.PEMS_DB.savePhotoBlob(fetsKey, stagedFets.dataUrl, {
+                propertyNo: f.propNo,
+                docType: 'fets',
+                mimeType: stagedFets.mimeType,
+                fileName: stagedFets.fileName,
+                fileSize: stagedFets.fileSize
+              });
+            }
+            if (stagedTransmittal && transmittalKey) {
+              await window.PEMS_DB.savePhotoBlob(transmittalKey, stagedTransmittal.dataUrl, {
+                propertyNo: f.propNo,
+                docType: 'transmittal',
+                mimeType: stagedTransmittal.mimeType,
+                fileName: stagedTransmittal.fileName,
+                fileSize: stagedTransmittal.fileSize
+              });
+            }
+          }
+
+          // 2. Mirror photo to localStorage for instant synchronous retrieval
+          if (stagedPhoto && window.localStorage) {
+            try {
+              localStorage.setItem('pems_photo_' + f.propNo, stagedPhoto.dataUrl);
+            } catch (quotaErr) {
+              console.warn('localStorage photo quota warning (IndexedDB holds full photo):', quotaErr);
+            }
+          }
+
+          // 3. Update row in memory with local preview data URLs
+          const newEquipmentPhoto = stagedPhoto ? stagedPhoto.dataUrl : (row[13] || f.equipmentPhoto);
+          const newUploadFets = stagedFets ? stagedFets.dataUrl : (row[16] || f.uploadFets);
+          const newUploadTransmittal = stagedTransmittal ? stagedTransmittal.dataUrl : (row[18] || f.uploadTransmittal);
+
+          if (row.length >= 20) {
+            if (newEquipmentPhoto) row[13] = newEquipmentPhoto;
+            if (canEditTrack) {
+              row[14] = fetsNo;
+              row[15] = fetsTo;
+              if (newUploadFets) row[16] = newUploadFets;
+              row[17] = transmittalDate;
+              if (newUploadTransmittal) row[18] = newUploadTransmittal;
+            }
+            row[19] = remarks;
+          } else if (row.length === 19) {
+            row.splice(13, 0, newEquipmentPhoto || '');
+            if (canEditTrack) {
+              row[14] = fetsNo;
+              row[15] = fetsTo;
+              if (newUploadFets) row[16] = newUploadFets;
+              row[17] = transmittalDate;
+              if (newUploadTransmittal) row[18] = newUploadTransmittal;
+            }
+            row[19] = remarks;
+            if (this.state.currentDetailHeaders && this.state.currentDetailHeaders.length === 19) {
+              this.state.currentDetailHeaders.splice(13, 0, 'EQUIPMENT_PHOTO');
+            }
+          } else {
+            if (canEditTrack) {
+              row[11] = fetsNo;
+              row[13] = fetsTo;
+              if (newUploadFets) row[16] = newUploadFets;
+              if (newUploadTransmittal) row[17] = newUploadTransmittal;
+            }
+            row[row.length - 1] = remarks;
+          }
+
+          // 4. Update memory tables
+          this.state.currentDetailRow = row;
+          if (this.state.selectedRowIdx !== undefined && this.state.filteredRows && this.state.filteredRows[this.state.selectedRowIdx]) {
+            this.state.filteredRows[this.state.selectedRowIdx] = row;
+          }
+          if (this.state.allRows) {
+            const matchIdx = this.state.allRows.findIndex(r => {
+              const rf = this.getRowFields(r);
+              return rf.propNo === f.propNo;
+            });
+            if (matchIdx !== -1) {
+              this.state.allRows[matchIdx] = row;
+            }
+          }
+
+          // 5. Save updated record in IndexedDB records store
+          if (window.PEMS_DB) {
+            const dbRecord = {
+              propertyNo: f.propNo,
+              articleDesc: f.article,
+              generalDesc: f.generalDesc,
+              serialNo: f.serial,
+              acquisitionCost: f.costRaw,
+              acquisitionDate: f.acquisitionDate,
+              parNo: f.parNo,
+              officeName: f.officeName,
+              receiver: f.receiver,
+              subPar: f.subPar,
+              dateUpload: f.dateUpload,
+              uploadedBy: f.uploadedBy,
+              status: f.status,
+              equipmentPhoto: newEquipmentPhoto,
+              fetsNo: fetsNo,
+              fetsTo: fetsTo,
+              uploadFets: newUploadFets,
+              transmittalDate: transmittalDate,
+              uploadTransmittal: newUploadTransmittal,
+              remarks: remarks,
+              rowValues: row,
+              syncStatus: 'pending',
+              clientUpdatedAt: new Date().toISOString()
+            };
+            await window.PEMS_DB.saveRecord(dbRecord);
+          }
+
+          // 6. Mirror updated record row in localStorage
+          if (window.localStorage) {
+            try {
+              const raw = localStorage.getItem('PEMS_UPLOADED_RECORDS');
+              let cached = raw ? JSON.parse(raw) : [];
+              const matchIdx = cached.findIndex(r => String(r && r[1] || '').trim().toUpperCase() === f.propNo.toUpperCase());
+              if (matchIdx !== -1) {
+                cached[matchIdx] = row;
+              } else {
+                cached.push(row);
+              }
+              localStorage.setItem('PEMS_UPLOADED_RECORDS', JSON.stringify(cached));
+            } catch (lsErr) {}
+          }
+
+          // 7. Enqueue mutation in IndexedDB sync queue
+          if (window.PEMS_DB) {
+            const idemKey = window.PEMS_SYNC ? window.PEMS_SYNC.generateIdempotencyKey() : ('track_' + Date.now());
+            const pKeys = [photoKey, fetsKey, transmittalKey].filter(Boolean);
+            await window.PEMS_DB.enqueueMutation({
+              action: 'UPDATE_ASSET_TRACKING',
+              payload: {
+                propNo: f.propNo,
+                serialNo: f.serial,
+                uploadedBy: f.uploadedBy,
+                fetsNo: fetsNo,
+                fetsTo: fetsTo,
+                transmittalDate: transmittalDate,
+                remarks: remarks,
+                existingEquipmentPhoto: f.equipmentPhoto || '',
+                existingUploadFets: f.uploadFets || '',
+                existingUploadTransmittal: f.uploadTransmittal || ''
+              },
+              photoKey: photoKey || fetsKey || transmittalKey || null,
+              photoKeys: pKeys,
+              idempotencyKey: idemKey
+            });
+          }
+
+          // 8. Clear staged docs, re-render, and notify
+          this.state.stagedDocs = {};
+          this.renderDetailBody();
+          this.filter();
+
+          if (window.PEMS_SYNC) {
+            window.PEMS_SYNC.refreshQueueStats();
+          }
+
+          PEMS.notification.success('Saved Offline', 'Asset details and images saved locally in device storage. They will sync automatically when online.');
+        } catch (localErr) {
+          console.error('Error during offline save:', localErr);
+          PEMS.notification.error('Local Save Error', 'Could not save locally: ' + (localErr.message || localErr));
+        } finally {
+          this.resetSaveButtonStates();
+        }
+      };
+
+      // If browser is offline, save offline immediately
+      if (!navigator.onLine) {
+        await saveOfflineLocal();
+        return;
+      }
+
+      // Online: Attempt server update with fallback to local offline save
       try {
         const res = await PEMS.api.updateAssetTracking(payload);
         if (!res || !res.success) {
@@ -12846,11 +13642,8 @@ var PEMS = {
         const newUploadFets = data.uploadFets || (stagedFets ? stagedFets.dataUrl : f.uploadFets);
         const newUploadTransmittal = data.uploadTransmittal || (stagedTransmittal ? stagedTransmittal.dataUrl : f.uploadTransmittal);
 
-        // Update active detail row
-        const firstHeader = (this.state.headers && this.state.headers[0]) ? String(this.state.headers[0]).toLowerCase() : '';
-        const is20Col = (row.length >= 20) || (this.state.currentDetailHeaders && this.state.currentDetailHeaders.length >= 20) || (this.state.headers && this.state.headers.length >= 20);
-
-        if (is20Col) {
+        // Update row
+        if (row.length >= 20) {
           if (newEquipmentPhoto) row[13] = newEquipmentPhoto;
           if (canEditTrack) {
             row[14] = fetsNo;
@@ -12861,7 +13654,6 @@ var PEMS = {
           }
           row[19] = remarks;
         } else if (row.length === 19) {
-          // If row was legacy 19 columns, upgrade to 20 columns by splicing in equipment photo at index 13
           row.splice(13, 0, newEquipmentPhoto || '');
           if (canEditTrack) {
             row[14] = fetsNo;
@@ -12884,7 +13676,7 @@ var PEMS = {
           row[row.length - 1] = remarks;
         }
 
-        // Also sync back to allRows and filteredRows
+        // Sync to memory
         if (this.state.selectedRowIdx !== undefined && this.state.filteredRows && this.state.filteredRows[this.state.selectedRowIdx]) {
           this.state.filteredRows[this.state.selectedRowIdx] = row;
         }
@@ -12898,13 +13690,55 @@ var PEMS = {
           }
         }
 
-        // Clear staged docs
+        // Cache in IndexedDB as synced
+        if (window.PEMS_DB) {
+          window.PEMS_DB.saveRecord({
+            propertyNo: f.propNo,
+            articleDesc: f.article,
+            generalDesc: f.generalDesc,
+            serialNo: f.serial,
+            acquisitionCost: f.costRaw,
+            acquisitionDate: f.acquisitionDate,
+            parNo: f.parNo,
+            officeName: f.officeName,
+            receiver: f.receiver,
+            subPar: f.subPar,
+            dateUpload: f.dateUpload,
+            uploadedBy: f.uploadedBy,
+            status: f.status,
+            equipmentPhoto: newEquipmentPhoto,
+            fetsNo: fetsNo,
+            fetsTo: fetsTo,
+            uploadFets: newUploadFets,
+            transmittalDate: transmittalDate,
+            uploadTransmittal: newUploadTransmittal,
+            remarks: remarks,
+            rowValues: row,
+            syncStatus: 'synced',
+            clientUpdatedAt: new Date().toISOString()
+          });
+        }
+
+        // Mirror in localStorage
+        if (window.localStorage) {
+          try {
+            const raw = localStorage.getItem('PEMS_UPLOADED_RECORDS');
+            let cached = raw ? JSON.parse(raw) : [];
+            const matchIdx = cached.findIndex(r => String(r && r[1] || '').trim().toUpperCase() === f.propNo.toUpperCase());
+            if (matchIdx !== -1) {
+              cached[matchIdx] = row;
+            } else {
+              cached.push(row);
+            }
+            localStorage.setItem('PEMS_UPLOADED_RECORDS', JSON.stringify(cached));
+          } catch (lsErr) {}
+        }
+
         this.state.stagedDocs = {};
-
-        // Re-render modal body with saved values
         this.renderDetailBody();
+        this.filter();
 
-        // AnimeJS micro-interaction: Soft pulse highlight on Section 1, Section 3 & Section 4 indicating successful save
+        // Animation highlight
         const anime = (window.PEMS_ANIMATION && window.PEMS_ANIMATION.getEngine()) || window.anime;
         const targets = [document.getElementById('sectionPropertyId'), document.getElementById('sectionTracking'), document.getElementById('sectionAuditRegistry')].filter(Boolean);
         if (anime && targets.length > 0) {
@@ -12918,24 +13752,37 @@ var PEMS = {
 
         PEMS.notification.success('Changes Saved', 'Asset details and photos successfully saved.');
       } catch (err) {
-        console.error('Error saving asset details:', err);
-        PEMS.notification.error('Save Failed', 'Error saving details: ' + (err.message || err));
-        if (btnSave) {
-          btnSave.disabled = false;
-          btnSave.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>Save Tracking & Remarks</span>';
-        }
-        if (btnSaveRem) {
-          btnSaveRem.disabled = false;
-          btnSaveRem.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>Save Remarks</span>';
-        }
-        if (btnSavePhoto) {
-          btnSavePhoto.disabled = false;
-          btnSavePhoto.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>Save Equipment Photo</span>';
-        }
-        if (statusEl) statusEl.textContent = 'Save failed.';
-        if (remStatusEl) remStatusEl.textContent = 'Save failed.';
-        if (photoStatusEl) photoStatusEl.textContent = 'Save failed.';
+        console.warn('Server save failed, falling back to offline local storage:', err);
+        // Fall back to offline local save so changes and photos are NEVER lost!
+        await saveOfflineLocal();
+      } finally {
+        this.resetSaveButtonStates();
       }
+    },
+
+    resetSaveButtonStates() {
+      const btnSave = document.getElementById('btnSaveTracking');
+      const btnSaveRem = document.getElementById('btnSaveRemarks');
+      const btnSavePhoto = document.getElementById('btnSavePhoto');
+      const statusEl = document.getElementById('trackingSaveStatus');
+      const remStatusEl = document.getElementById('remarksSaveStatus');
+      const photoStatusEl = document.getElementById('photoSaveStatus');
+
+      if (btnSave) {
+        btnSave.disabled = false;
+        btnSave.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>Save Tracking & Remarks</span>';
+      }
+      if (btnSaveRem) {
+        btnSaveRem.disabled = false;
+        btnSaveRem.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>Save Remarks</span>';
+      }
+      if (btnSavePhoto) {
+        btnSavePhoto.disabled = false;
+        btnSavePhoto.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>Save Equipment Photo</span>';
+      }
+      if (statusEl) statusEl.textContent = '';
+      if (remStatusEl) remStatusEl.textContent = '';
+      if (photoStatusEl) photoStatusEl.textContent = '';
     },
 
     showEmpty(title, desc) {

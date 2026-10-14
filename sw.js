@@ -12,7 +12,7 @@
  * 3. Offline Navigation Fallback: Serves cached index.html
  */
 
-const CACHE_NAME = 'pems-pwa-v1.0.0';
+const CACHE_NAME = 'pems-pwa-v1.0.1';
 
 const PRECACHE_ASSETS = [
   './',
@@ -22,6 +22,7 @@ const PRECACHE_ASSETS = [
   './js/db.js',
   './js/sync.js',
   './js/pwa-install.js',
+  './js/jsQR.js',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',

@@ -439,8 +439,66 @@
         updatedAt: new Date().toISOString()
       };
 
+      const propNo = payload && (payload.propNo || payload.propertyNo);
+
       return this._getTransaction('syncQueue', 'readwrite').then(({ store }) => {
         return new Promise((resolve, reject) => {
+          // Coalesce duplicate pending/failed mutations for the same property
+          if (propNo && (action === 'UPDATE_ASSET_TRACKING' || action === 'updateAssetTracking')) {
+            const getReq = store.getAll();
+            getReq.onsuccess = () => {
+              const all = getReq.result || [];
+              const cleanProp = String(propNo).trim().toUpperCase();
+              const existing = all.find(m => {
+                if (m.status !== 'pending' && m.status !== 'failed') return false;
+                const mAction = m.action;
+                const mProp = m.payload && (m.payload.propNo || m.payload.propertyNo);
+                return (mAction === 'UPDATE_ASSET_TRACKING' || mAction === 'updateAssetTracking') &&
+                  String(mProp || '').trim().toUpperCase() === cleanProp;
+              });
+
+              if (existing) {
+                // Merge payload, reset retry state
+                existing.payload = Object.assign({}, existing.payload || {}, payload);
+                if (photoKey) existing.photoKey = photoKey;
+                if (pKeys.length > 0) existing.photoKeys = Array.from(new Set((existing.photoKeys || []).concat(pKeys)));
+                existing.status = 'pending';
+                existing.retries = 0;
+                existing.lastError = null;
+                existing.updatedAt = new Date().toISOString();
+                const putReq = store.put(existing);
+                putReq.onsuccess = () => {
+                  if (window.PEMS_SYNC && typeof window.PEMS_SYNC.refreshQueueStats === 'function') {
+                    window.PEMS_SYNC.refreshQueueStats();
+                  }
+                  resolve(existing);
+                };
+                putReq.onerror = () => reject(putReq.error);
+                return;
+              }
+
+              // No existing mutation, add new
+              const req = store.add(mutation);
+              req.onsuccess = () => {
+                mutation.id = req.result;
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.ready.then(reg => {
+                    if (reg && reg.sync && typeof reg.sync.register === 'function') {
+                      reg.sync.register('pems-sync-queue').catch(() => {});
+                    }
+                  }).catch(() => {});
+                }
+                if (window.PEMS_SYNC && typeof window.PEMS_SYNC.refreshQueueStats === 'function') {
+                  window.PEMS_SYNC.refreshQueueStats();
+                }
+                resolve(mutation);
+              };
+              req.onerror = () => reject(req.error);
+            };
+            getReq.onerror = () => reject(getReq.error);
+            return;
+          }
+
           const req = store.add(mutation);
           req.onsuccess = () => {
             mutation.id = req.result;

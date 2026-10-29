@@ -9234,7 +9234,10 @@
       try {
         const stored = localStorage.getItem(this.API_URL_STORAGE_KEY);
         if (stored && stored.trim().startsWith('http')) {
-          return stored.trim();
+          const trimmed = stored.trim();
+          if (!trimmed.endsWith('/dev')) {
+            return trimmed;
+          }
         }
       } catch (e) {}
 
@@ -9282,10 +9285,14 @@
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
 
         const res = await fetch(url, {
           method: 'POST',
+          mode: 'cors',
+          credentials: 'omit',
+          redirect: 'follow',
+          cache: 'no-store',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ action: 'ping' }),
           signal: controller.signal
@@ -9294,11 +9301,11 @@
 
         if (res.ok) {
           const json = await res.json().catch(() => null);
-          if (json && (json.success || json.code === 'UNKNOWN_ACTION')) {
+          if (json && (json.success || json.code === 'UNKNOWN_ACTION' || json.status === 'ONLINE')) {
             return {
               success: true,
-              message: `Connected successfully to PEMS API (${json.data && json.data.version ? json.data.version : 'Online'}).`,
-              data: json.data
+              message: `Connected successfully to PEMS API (${(json.data && json.data.version) || json.version || 'Online'}).`,
+              data: json.data || json
             };
           }
           return {
@@ -9314,7 +9321,7 @@
         return {
           success: false,
           message: err.name === 'AbortError'
-            ? 'Connection timed out after 8s. Check network connectivity and script permissions.'
+            ? 'Connection timed out after 15s. Check network connectivity and script permissions.'
             : `Network error: ${err.message}. Ensure Web App is deployed with access set to "Anyone".`
         };
       }
@@ -9769,8 +9776,66 @@
         updatedAt: new Date().toISOString()
       };
 
+      const propNo = payload && (payload.propNo || payload.propertyNo);
+
       return this._getTransaction('syncQueue', 'readwrite').then(({ store }) => {
         return new Promise((resolve, reject) => {
+          // Coalesce duplicate pending/failed mutations for the same property
+          if (propNo && (action === 'UPDATE_ASSET_TRACKING' || action === 'updateAssetTracking')) {
+            const getReq = store.getAll();
+            getReq.onsuccess = () => {
+              const all = getReq.result || [];
+              const cleanProp = String(propNo).trim().toUpperCase();
+              const existing = all.find(m => {
+                if (m.status !== 'pending' && m.status !== 'failed') return false;
+                const mAction = m.action;
+                const mProp = m.payload && (m.payload.propNo || m.payload.propertyNo);
+                return (mAction === 'UPDATE_ASSET_TRACKING' || mAction === 'updateAssetTracking') &&
+                  String(mProp || '').trim().toUpperCase() === cleanProp;
+              });
+
+              if (existing) {
+                // Merge payload, reset retry state
+                existing.payload = Object.assign({}, existing.payload || {}, payload);
+                if (photoKey) existing.photoKey = photoKey;
+                if (pKeys.length > 0) existing.photoKeys = Array.from(new Set((existing.photoKeys || []).concat(pKeys)));
+                existing.status = 'pending';
+                existing.retries = 0;
+                existing.lastError = null;
+                existing.updatedAt = new Date().toISOString();
+                const putReq = store.put(existing);
+                putReq.onsuccess = () => {
+                  if (window.PEMS_SYNC && typeof window.PEMS_SYNC.refreshQueueStats === 'function') {
+                    window.PEMS_SYNC.refreshQueueStats();
+                  }
+                  resolve(existing);
+                };
+                putReq.onerror = () => reject(putReq.error);
+                return;
+              }
+
+              // No existing mutation, add new
+              const req = store.add(mutation);
+              req.onsuccess = () => {
+                mutation.id = req.result;
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.ready.then(reg => {
+                    if (reg && reg.sync && typeof reg.sync.register === 'function') {
+                      reg.sync.register('pems-sync-queue').catch(() => {});
+                    }
+                  }).catch(() => {});
+                }
+                if (window.PEMS_SYNC && typeof window.PEMS_SYNC.refreshQueueStats === 'function') {
+                  window.PEMS_SYNC.refreshQueueStats();
+                }
+                resolve(mutation);
+              };
+              req.onerror = () => reject(req.error);
+            };
+            getReq.onerror = () => reject(getReq.error);
+            return;
+          }
+
           const req = store.add(mutation);
           req.onsuccess = () => {
             mutation.id = req.result;
@@ -10003,13 +10068,15 @@
         if (window.PEMS && window.PEMS.notification) {
           window.PEMS.notification.info('Online Detected', 'Network connection restored. Auto-syncing gathered offline data...');
         }
-        // Immediate trigger + debounced retry after mobile radio stabilizes
-        this.triggerSync('network_reconnected');
+        // Debounce by 1200ms to allow mobile cellular / Wi-Fi DNS socket to stabilize
+        setTimeout(() => {
+          this.triggerSync('network_reconnected');
+        }, 1200);
         setTimeout(() => {
           if (!this.state.isSyncing && (this.state.pendingCount > 0 || this.state.failedCount > 0)) {
             this.triggerSync('network_reconnected_retry');
           }
-        }, 2500);
+        }, 4500);
       });
 
       window.addEventListener('offline', () => {
@@ -10118,35 +10185,48 @@
       }
 
       const apiUrl = (window.PEMS_CONFIG && window.PEMS_CONFIG.getApiUrl) ? window.PEMS_CONFIG.getApiUrl() : '';
-      if (!apiUrl) {
+      const defaultApiUrl = (window.PEMS_CONFIG && window.PEMS_CONFIG.DEFAULT_API_URL) ? window.PEMS_CONFIG.DEFAULT_API_URL : '';
+      const targetUrl = apiUrl || defaultApiUrl;
+      if (!targetUrl) {
         this.state.serverReachable = false;
         return false;
       }
 
-      try {
+      const probe = async (url) => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 7000);
-
-        // Ping backend using POST to eliminate CORS preflight issues
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'ping' }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const json = await response.json().catch(() => null);
-          // Even if an older backend deployment returns UNKNOWN_ACTION for 'ping',
-          // a valid JSON response from script.google.com proves the backend is reachable.
-          this.state.serverReachable = Boolean(json && typeof json === 'object');
-          return this.state.serverReachable;
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            mode: 'cors',
+            credentials: 'omit',
+            redirect: 'follow',
+            cache: 'no-store',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'ping' }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          if (response.ok) {
+            const json = await response.json().catch(() => null);
+            return Boolean(json && typeof json === 'object');
+          }
+          return false;
+        } catch (e) {
+          clearTimeout(timeoutId);
+          return false;
         }
-        this.state.serverReachable = false;
-        return false;
+      };
+
+      try {
+        let isReachable = await probe(targetUrl);
+        if (!isReachable && defaultApiUrl && targetUrl !== defaultApiUrl) {
+          isReachable = await probe(defaultApiUrl);
+        }
+        this.state.serverReachable = isReachable;
+        return isReachable;
       } catch (err) {
-        console.warn('[PEMS Sync] Connectivity check failed (offline or unreachable):', err.message);
+        console.warn('[PEMS Sync] Connectivity check error:', err);
         this.state.serverReachable = false;
         return false;
       }
@@ -10529,21 +10609,70 @@
         }
       }
 
-      // Execute via PEMS.api.invoke
+      // Convert inline data URLs into file upload objects and strip raw data URLs from payload
+      if (typeof payload.existingEquipmentPhoto === 'string' && payload.existingEquipmentPhoto.startsWith('data:')) {
+        if (!payload.equipmentPhotoFile && payload.existingEquipmentPhoto.indexOf(';base64,') !== -1) {
+          const parts = payload.existingEquipmentPhoto.split(';base64,');
+          payload.equipmentPhotoFile = {
+            base64: parts[1],
+            mimeType: parts[0].replace('data:', '') || 'image/jpeg',
+            fileName: ((payload.propNo || payload.propertyNo || 'photo').replace(/[^a-zA-Z0-9_-]/g, '_')) + '.jpg'
+          };
+        }
+        payload.existingEquipmentPhoto = '';
+      }
+      if (typeof payload.existingUploadFets === 'string' && payload.existingUploadFets.startsWith('data:')) {
+        if (!payload.fetsFile && payload.existingUploadFets.indexOf(';base64,') !== -1) {
+          const parts = payload.existingUploadFets.split(';base64,');
+          payload.fetsFile = {
+            base64: parts[1],
+            mimeType: parts[0].replace('data:', '') || 'application/pdf',
+            fileName: 'FETS_' + ((payload.propNo || payload.propertyNo || 'fets').replace(/[^a-zA-Z0-9_-]/g, '_')) + '.pdf'
+          };
+        }
+        payload.existingUploadFets = '';
+      }
+      if (typeof payload.existingUploadTransmittal === 'string' && payload.existingUploadTransmittal.startsWith('data:')) {
+        if (!payload.transmittalFile && payload.existingUploadTransmittal.indexOf(';base64,') !== -1) {
+          const parts = payload.existingUploadTransmittal.split(';base64,');
+          payload.transmittalFile = {
+            base64: parts[1],
+            mimeType: parts[0].replace('data:', '') || 'application/pdf',
+            fileName: 'TRANSMITTAL_' + ((payload.propNo || payload.propertyNo || 'transmittal').replace(/[^a-zA-Z0-9_-]/g, '_')) + '.pdf'
+          };
+        }
+        payload.existingUploadTransmittal = '';
+      }
+
+      // Execute via PEMS.api.invoke with automatic 1-time retry for transient network errors
       if (window.PEMS && window.PEMS.api && typeof window.PEMS.api.invoke === 'function') {
         const sess = window.PEMS.session ? window.PEMS.session.get() : null;
         const sessionId = sess ? sess.sessionId : null;
 
-        if (action === 'ADD_MANUAL_INVENTORY' || action === 'addManualInventoryRecord') {
-          return window.PEMS.api.addManualInventoryRecord(payload);
-        } else if (action === 'UPDATE_ASSET_TRACKING' || action === 'updateAssetTracking') {
-          return window.PEMS.api.updateAssetTracking(payload);
-        } else if (action === 'DELETE_INVENTORY_RECORD' || action === 'deleteInventoryRecord') {
-          return window.PEMS.api.deleteInventoryRecord(payload.propertyNo || payload.propNo);
-        } else if (action === 'PROCESS_RAW_DATA_UPLOAD' || action === 'processRawDataUpload') {
-          return window.PEMS.api.processRawDataUpload(payload);
-        } else {
-          return window.PEMS.api.invoke(action, sessionId, payload);
+        const invokeCall = async () => {
+          if (action === 'ADD_MANUAL_INVENTORY' || action === 'addManualInventoryRecord') {
+            return window.PEMS.api.addManualInventoryRecord(payload);
+          } else if (action === 'UPDATE_ASSET_TRACKING' || action === 'updateAssetTracking') {
+            return window.PEMS.api.updateAssetTracking(payload);
+          } else if (action === 'DELETE_INVENTORY_RECORD' || action === 'deleteInventoryRecord') {
+            return window.PEMS.api.deleteInventoryRecord(payload.propertyNo || payload.propNo);
+          } else if (action === 'PROCESS_RAW_DATA_UPLOAD' || action === 'processRawDataUpload') {
+            return window.PEMS.api.processRawDataUpload(payload);
+          } else {
+            return window.PEMS.api.invoke(action, sessionId, payload);
+          }
+        };
+
+        try {
+          return await invokeCall();
+        } catch (callErr) {
+          const msg = String(callErr && callErr.message || '');
+          if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('AbortError')) {
+            console.log('[PEMS Sync] Transient network error, retrying mutation in 1500ms...');
+            await new Promise(r => setTimeout(r, 1500));
+            return await invokeCall();
+          }
+          throw callErr;
         }
       }
 
@@ -10687,7 +10816,17 @@
           ? window.PEMS.users.escapeHtml.bind(window.PEMS.users)
           : (s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
 
-        let html = '<div class="sync-queue-items-list">';
+        let html = `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;padding:0 0.25rem;">
+            <button type="button" class="btn btn-xs btn-primary" onclick="window.PEMS_SYNC.triggerSync('drawer_manual')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg> Sync All Now
+            </button>
+            <button type="button" class="btn btn-xs btn-outline" style="color:var(--text-muted);" onclick="window.PEMS_SYNC.clearAllQueue()">
+              Clear Queue
+            </button>
+          </div>
+          <div class="sync-queue-items-list">
+        `;
         mutations.forEach(item => {
           const statusClass = item.status === 'failed' ? 'status-err' : (item.status === 'syncing' ? 'status-syncing' : 'status-pending');
           const statusLabel = item.status === 'failed' ? 'Waiting for Retry' : (item.status === 'syncing' ? 'Syncing...' : 'Pending Sync');
@@ -10699,7 +10838,10 @@
             <div class="sync-queue-card ${statusClass}">
               <div class="sync-card-header">
                 <span class="sync-card-prop font-mono">${esc(propNo)}</span>
-                <span class="sync-card-status ${statusClass}">${statusLabel}</span>
+                <div style="display:flex;align-items:center;gap:0.4rem;">
+                  <span class="sync-card-status ${statusClass}">${statusLabel}</span>
+                  <button type="button" class="btn btn-xs btn-outline" style="padding:1px 5px;font-size:11px;min-height:unset;line-height:1;" onclick="window.PEMS_SYNC.removeQueueItem(${item.id})" title="Remove item from queue">✕</button>
+                </div>
               </div>
               <div class="sync-card-body font-mono text-xs">
                 <div>Action: <strong>${esc(actionLabel)}</strong></div>
@@ -10716,6 +10858,29 @@
         if (container) {
           container.innerHTML = `<div style="padding: 2rem; color: #ef4444;">Failed to load sync queue: ${err.message}</div>`;
         }
+      }
+    },
+
+    async removeQueueItem(id) {
+      if (!window.PEMS_DB) return;
+      try {
+        await window.PEMS_DB.removeMutation(id);
+        await this.refreshQueueStats();
+        this.openSyncDrawer();
+      } catch (e) {
+        console.warn('Could not remove item:', e);
+      }
+    },
+
+    async clearAllQueue() {
+      if (!window.PEMS_DB) return;
+      if (!confirm('Are you sure you want to clear all offline items in the synchronization queue?')) return;
+      try {
+        await window.PEMS_DB.clearSyncQueue();
+        await this.refreshQueueStats();
+        this.openSyncDrawer();
+      } catch (e) {
+        console.warn('Could not clear queue:', e);
       }
     },
 
@@ -15945,9 +16110,6 @@ var PEMS = {
         this.closeAddNewModal();
         if (window.PEMS_SYNC) {
           window.PEMS_SYNC.refreshQueueStats();
-          if (navigator.onLine) {
-            window.PEMS_SYNC.syncNow();
-          }
         }
         PEMS.notification.success('Asset Saved Locally (Offline)', 'Asset ' + propertyNo + ' saved to local storage. It will automatically sync to Google Sheets when online.');
       };
@@ -17101,14 +17263,16 @@ var PEMS = {
         btn.textContent = 'Delete Permanently';
       }
       PEMS.modal.close('deleteConfirmModal');
-      PEMS.modal.close('assetDetailModal');
+      PEMS.modal.close('invAssetDetailModal');
       this.updateCountBadge();
-      this.renderCategorizedTable();
+      this.filter();
 
       // 5. Trigger sync if online
       if (window.PEMS_SYNC) {
         window.PEMS_SYNC.refreshQueueStats();
-        window.PEMS_SYNC.syncNow();
+        if (navigator.onLine) {
+          window.PEMS_SYNC.triggerSync('delete_record');
+        }
       }
 
       PEMS.notification.success('Asset Deleted', 'Record ' + propNo + ' has been removed locally and queued for synchronization.');
@@ -17810,8 +17974,39 @@ var PEMS = {
       const stagedFets = this.state.stagedDocs && this.state.stagedDocs.fets;
       const stagedTransmittal = this.state.stagedDocs && this.state.stagedDocs.transmittal;
 
+      const extractBase64Data = (str, defaultMime, defaultExt) => {
+        if (!str || typeof str !== 'string' || !str.startsWith('data:')) return null;
+        if (str.indexOf(';base64,') === -1) return null;
+        const parts = str.split(';base64,');
+        const mime = parts[0].replace('data:', '') || defaultMime;
+        const b64 = parts[1] || '';
+        if (!b64) return null;
+        return {
+          base64: b64,
+          mimeType: mime,
+          fileName: (f.propNo || 'asset').replace(/[^a-zA-Z0-9_-]/g, '_') + defaultExt
+        };
+      };
+
+      const fallbackPhotoFile = !stagedPhoto && f.equipmentPhoto && f.equipmentPhoto.startsWith('data:')
+        ? extractBase64Data(f.equipmentPhoto, 'image/jpeg', '.jpg') : null;
+      const fallbackFetsFile = !stagedFets && f.uploadFets && f.uploadFets.startsWith('data:')
+        ? extractBase64Data(f.uploadFets, 'application/pdf', '.pdf') : null;
+      const fallbackTransFile = !stagedTransmittal && f.uploadTransmittal && f.uploadTransmittal.startsWith('data:')
+        ? extractBase64Data(f.uploadTransmittal, 'application/pdf', '.pdf') : null;
+
+      const safeExistingPhoto = (f.equipmentPhoto && !f.equipmentPhoto.startsWith('data:')) ? f.equipmentPhoto : '';
+      const safeExistingFets = (f.uploadFets && !f.uploadFets.startsWith('data:')) ? f.uploadFets : '';
+      const safeExistingTrans = (f.uploadTransmittal && !f.uploadTransmittal.startsWith('data:')) ? f.uploadTransmittal : '';
+
+      const sanitizedRowValues = Array.isArray(row) ? row.slice(0, 20).map(c => {
+        const s = String(c || '');
+        return s.startsWith('data:') ? '' : c;
+      }) : null;
+
       const payload = {
         propNo: f.propNo,
+        propertyNo: f.propNo,
         serialNo: f.serial,
         uploadedBy: f.uploadedBy,
         status: statusVal,
@@ -17819,24 +18014,25 @@ var PEMS = {
         fetsTo: fetsTo,
         transmittalDate: transmittalDate,
         remarks: remarks,
-        existingEquipmentPhoto: f.equipmentPhoto || '',
-        existingUploadFets: f.uploadFets || '',
-        existingUploadTransmittal: f.uploadTransmittal || '',
+        rowValues: sanitizedRowValues,
+        existingEquipmentPhoto: safeExistingPhoto,
+        existingUploadFets: safeExistingFets,
+        existingUploadTransmittal: safeExistingTrans,
         equipmentPhotoFile: stagedPhoto ? {
           base64: stagedPhoto.base64,
           mimeType: stagedPhoto.mimeType,
           fileName: stagedPhoto.fileName
-        } : null,
+        } : fallbackPhotoFile,
         fetsFile: stagedFets ? {
           base64: stagedFets.base64,
           mimeType: stagedFets.mimeType,
           fileName: stagedFets.fileName
-        } : null,
+        } : fallbackFetsFile,
         transmittalFile: stagedTransmittal ? {
           base64: stagedTransmittal.base64,
           mimeType: stagedTransmittal.mimeType,
           fileName: stagedTransmittal.fileName
-        } : null
+        } : fallbackTransFile
       };
 
       if (btnSave) {
@@ -18072,9 +18268,6 @@ var PEMS = {
 
           if (window.PEMS_SYNC) {
             window.PEMS_SYNC.refreshQueueStats();
-            if (navigator.onLine) {
-              window.PEMS_SYNC.syncNow();
-            }
           }
 
           PEMS.notification.success('Saved Offline', 'Asset details and images saved locally in device storage. They will sync automatically when online.');
@@ -18660,180 +18853,196 @@ var PEMS = {
    * =========================================================================
    */
   api: {
+    getActiveSessionId() {
+      const sess = (PEMS.session && typeof PEMS.session.get === 'function') ? PEMS.session.get() : null;
+      let raw = (sess && sess.sessionId) ? sess.sessionId : (sess || (PEMS.state && PEMS.state.session && PEMS.state.session.sessionId) || (PEMS.state && PEMS.state.session) || '');
+      let sid = typeof raw === 'string' ? raw.trim() : (raw && raw.sessionId ? String(raw.sessionId).trim() : '');
+      if (!sid) {
+        const u = (PEMS.state && PEMS.state.user) || (sess && sess.user) || (PEMS.session && typeof PEMS.session.getUser === 'function' ? PEMS.session.getUser() : null);
+        if (u && (u.userId || u.username)) {
+          sid = 'SES-BRIDGE-' + (u.userId || u.username) + '-' + Date.now();
+          if (PEMS.session && typeof PEMS.session.save === 'function') {
+            try { PEMS.session.save(sid, new Date(Date.now() + 7 * 86400000).toISOString(), u); } catch (e) {}
+          }
+        }
+      }
+      return sid;
+    },
+
     invoke(serverFunctionName, ...args) {
       return new Promise((resolve, reject) => {
         const apiContext = (this && this.localMock) ? this : PEMS.api;
         const apiUrl = (window.PEMS_CONFIG && typeof window.PEMS_CONFIG.getApiUrl === 'function') ? window.PEMS_CONFIG.getApiUrl() : '';
+        const defaultApiUrl = (window.PEMS_CONFIG && window.PEMS_CONFIG.DEFAULT_API_URL) ? window.PEMS_CONFIG.DEFAULT_API_URL : '';
 
-        // PATH A: If a standalone Google Apps Script Web App API URL is configured (GitHub Pages / Standalone PWA)
-        if (apiUrl) {
-          const strictNetworkActions = [
-            'addManualInventoryRecord',
-            'updateAssetTracking',
-            'deleteInventoryRecord',
-            'processRawDataUpload',
-            'batchSync',
-            'getDriveInventoryData',
-            'getDriveSemiExpendableData'
-          ];
-          const onlineWriteActions = [
-            'register',
-            'createInitialAdmin',
-            'updateUser',
-            'createTurnover',
-            'respondToTurnover',
-            'cancelTurnover',
-            'recoverUsername',
-            'requestPasswordReset',
-            'resetPassword'
-          ];
-          const isStrictNetworkAction = strictNetworkActions.indexOf(serverFunctionName) !== -1;
-          const isOnlineWriteAction = onlineWriteActions.indexOf(serverFunctionName) !== -1;
+        const strictNetworkActions = [
+          'addManualInventoryRecord',
+          'updateAssetTracking',
+          'deleteInventoryRecord',
+          'processRawDataUpload',
+          'batchSync',
+          'getDriveInventoryData',
+          'getDriveSemiExpendableData'
+        ];
+        const onlineWriteActions = [
+          'register',
+          'createInitialAdmin',
+          'updateUser',
+          'createTurnover',
+          'respondToTurnover',
+          'cancelTurnover',
+          'recoverUsername',
+          'requestPasswordReset',
+          'resetPassword'
+        ];
+        const isStrictNetworkAction = strictNetworkActions.indexOf(serverFunctionName) !== -1;
+        const isOnlineWriteAction = onlineWriteActions.indexOf(serverFunctionName) !== -1;
 
-          if (!navigator.onLine && isStrictNetworkAction) {
-            reject(new Error('Device is currently in offline mode.'));
-            return;
-          }
-
-          const buildRequestBody = (overrideSessionId) => {
-            const requestBody = { action: serverFunctionName };
-            const activeUser = (PEMS.state && PEMS.state.user) || (PEMS.session && typeof PEMS.session.getUser === 'function' ? PEMS.session.getUser() : null);
-            if (activeUser) {
-              requestBody.authUser = {
-                userId: activeUser.userId || '',
-                username: activeUser.username || '',
-                email: activeUser.email || '',
-                firstName: activeUser.firstName || '',
-                middleName: activeUser.middleName || '',
-                lastName: activeUser.lastName || '',
-                fullName: activeUser.fullName || [activeUser.firstName, activeUser.middleName, activeUser.lastName].filter(Boolean).join(' ').trim(),
-                role: activeUser.role || 'USER'
-              };
-            }
-
-            if (serverFunctionName === 'login') {
-              requestBody.username = args[0];
-              requestBody.password = args[1];
-            } else if (serverFunctionName === 'register' || serverFunctionName === 'createInitialAdmin') {
-              requestBody.payload = args[0];
-            } else if (serverFunctionName === 'recoverUsername' || serverFunctionName === 'requestPasswordReset') {
-              requestBody.email = args[0];
-            } else if (serverFunctionName === 'resetPassword') {
-              requestBody.email = args[0];
-              requestBody.token = args[1];
-              requestBody.newPassword = args[2];
-            } else if (serverFunctionName === 'getDriveInventoryData') {
-              requestBody.sessionId = overrideSessionId || args[0];
-              requestBody.spreadsheetName = args[1];
-              requestBody.filterUploaderFullName = args[2];
-            } else if (serverFunctionName === 'getDriveSemiExpendableData') {
-              requestBody.sessionId = overrideSessionId || args[0];
-              requestBody.filterType = args[1];
-            } else if (serverFunctionName === 'deleteInventoryRecord') {
-              requestBody.sessionId = overrideSessionId || args[0];
-              requestBody.propertyNo = args[1];
-            } else if (serverFunctionName === 'validateSession' || serverFunctionName === 'logout' || serverFunctionName === 'getDashboardStats' || serverFunctionName === 'getUsers' || serverFunctionName === 'getUploaderUsers' || serverFunctionName === 'getTurnovers' || serverFunctionName === 'getTurnoverEligibleUsers' || serverFunctionName === 'getProfile') {
-              requestBody.sessionId = overrideSessionId || args[0];
-            } else if (serverFunctionName === 'updateUser' || serverFunctionName === 'processRawDataUpload' || serverFunctionName === 'addManualInventoryRecord' || serverFunctionName === 'updateAssetTracking' || serverFunctionName === 'batchSync' || serverFunctionName === 'createTurnover' || serverFunctionName === 'respondToTurnover' || serverFunctionName === 'cancelTurnover') {
-              requestBody.sessionId = overrideSessionId || args[0];
-              requestBody.payload = args[1];
-            } else {
-              requestBody.sessionId = overrideSessionId || args[0];
-              requestBody.payload = args[1];
-            }
-            return requestBody;
-          };
-
-          const executePost = (overrideSessionId, isRetry) => {
-            const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-            const timeoutMs = (serverFunctionName === 'processRawDataUpload' || serverFunctionName === 'updateAssetTracking' || serverFunctionName === 'batchSync' || serverFunctionName === 'getDriveInventoryData' || serverFunctionName === 'getDriveSemiExpendableData') ? 45000 : 25000;
-            const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
-
-            fetch(apiUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify(buildRequestBody(overrideSessionId)),
-              signal: controller ? controller.signal : undefined
-            })
-            .then(res => {
-              if (timeoutId) clearTimeout(timeoutId);
-              if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + res.statusText);
-              return res.json();
-            })
-            .then(async data => {
-              // If server rejected due to unbridged/expired sessionId, auto-refresh session once and retry
-              const errCode = (data && data.code) || (data && data.data && data.data.code) || '';
-              if (!isRetry && serverFunctionName !== 'login' && serverFunctionName !== 'validateSession' &&
-                  data && data.success === false &&
-                  (errCode === 'SESSION_NOT_FOUND' || errCode === 'SESSION_EXPIRED' || errCode === 'SESSION_INVALID' || errCode === 'NO_SESSION')) {
-                if (window.PEMS_SYNC && typeof window.PEMS_SYNC.ensureOnlineSession === 'function') {
-                  const refreshedSessionId = await window.PEMS_SYNC.ensureOnlineSession(true);
-                  if (refreshedSessionId) {
-                    executePost(refreshedSessionId, true);
-                    return;
-                  }
-                }
-              }
-
-              // Cache real server data for offline use on mobile/tablet
-              if (data && data.success && window.localStorage) {
-                try {
-                  if (serverFunctionName === 'getUsers' && data.data && Array.isArray(data.data.users)) {
-                    localStorage.setItem('pems_real_users_cache', JSON.stringify(data.data.users));
-                  } else if (serverFunctionName === 'getTurnovers' && data.data) {
-                    localStorage.setItem('pems_real_turnovers_cache', JSON.stringify(data.data));
-                  } else if (serverFunctionName === 'getTurnoverEligibleUsers' && data.data && Array.isArray(data.data.users)) {
-                    localStorage.setItem('pems_real_eligible_users_cache', JSON.stringify(data.data.users));
-                  } else if (serverFunctionName === 'getDashboardStats' && data.data) {
-                    localStorage.setItem('pems_real_stats_cache', JSON.stringify(data.data));
-                  }
-                } catch (cacheErr) {}
-              }
-
-              resolve(data);
-            })
-            .catch(fetchErr => {
-              if (timeoutId) clearTimeout(timeoutId);
-              console.warn('[PEMS API] HTTP Web API fetch failed or offline (' + serverFunctionName + '):', fetchErr);
-              if (isStrictNetworkAction) {
-                reject(fetchErr);
-                return;
-              }
-              if (isOnlineWriteAction) {
-                resolve({
-                  success: false,
-                  message: navigator.onLine
-                    ? ('Could not reach the PEMS Google Spreadsheet server (' + (fetchErr.message || 'Network timeout') + '). Please try again.')
-                    : 'You are currently offline. This action requires an internet connection to update the central user/turnover database.'
-                });
-                return;
-              }
-              apiContext.localMock(serverFunctionName, args, resolve, reject);
-            });
-          };
-
-          executePost(null, false);
+        if (!navigator.onLine && isStrictNetworkAction) {
+          reject(new Error('Device is currently in offline mode.'));
           return;
         }
 
-        // PATH B: Standard Apps Script container (google.script.run)
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          const strictNetworkActions = [
-            'addManualInventoryRecord',
-            'updateAssetTracking',
-            'deleteInventoryRecord',
-            'processRawDataUpload',
-            'batchSync',
-            'getDriveInventoryData',
-            'getDriveSemiExpendableData'
-          ];
-          const isStrictNetworkAction = strictNetworkActions.indexOf(serverFunctionName) !== -1;
-
-          if (!navigator.onLine && isStrictNetworkAction) {
-            reject(new Error('Device is currently in offline mode.'));
-            return;
+        const buildRequestBody = (overrideSessionId) => {
+          const requestBody = { action: serverFunctionName };
+          const activeUser = (PEMS.state && PEMS.state.user) || (PEMS.session && typeof PEMS.session.getUser === 'function' ? PEMS.session.getUser() : null);
+          if (activeUser) {
+            requestBody.authUser = {
+              userId: activeUser.userId || '',
+              username: activeUser.username || '',
+              email: activeUser.email || '',
+              firstName: activeUser.firstName || '',
+              middleName: activeUser.middleName || '',
+              lastName: activeUser.lastName || '',
+              fullName: activeUser.fullName || [activeUser.firstName, activeUser.middleName, activeUser.lastName].filter(Boolean).join(' ').trim(),
+              role: activeUser.role || 'USER'
+            };
           }
 
+          const effectiveSessionId = overrideSessionId || PEMS.api.getActiveSessionId() || args[0] || '';
+
+          if (serverFunctionName === 'login') {
+            requestBody.username = args[0];
+            requestBody.password = args[1];
+          } else if (serverFunctionName === 'register' || serverFunctionName === 'createInitialAdmin') {
+            requestBody.payload = args[0];
+          } else if (serverFunctionName === 'recoverUsername' || serverFunctionName === 'requestPasswordReset') {
+            requestBody.email = args[0];
+          } else if (serverFunctionName === 'resetPassword') {
+            requestBody.email = args[0];
+            requestBody.token = args[1];
+            requestBody.newPassword = args[2];
+          } else if (serverFunctionName === 'getDriveInventoryData') {
+            requestBody.sessionId = effectiveSessionId;
+            requestBody.spreadsheetName = args[1];
+            requestBody.filterUploaderFullName = args[2];
+          } else if (serverFunctionName === 'getDriveSemiExpendableData') {
+            requestBody.sessionId = effectiveSessionId;
+            requestBody.filterType = args[1];
+          } else if (serverFunctionName === 'deleteInventoryRecord') {
+            requestBody.sessionId = effectiveSessionId;
+            requestBody.propertyNo = args[1];
+          } else if (serverFunctionName === 'validateSession' || serverFunctionName === 'logout' || serverFunctionName === 'getDashboardStats' || serverFunctionName === 'getUsers' || serverFunctionName === 'getUploaderUsers' || serverFunctionName === 'getTurnovers' || serverFunctionName === 'getTurnoverEligibleUsers' || serverFunctionName === 'getProfile') {
+            requestBody.sessionId = effectiveSessionId;
+          } else if (serverFunctionName === 'updateUser' || serverFunctionName === 'processRawDataUpload' || serverFunctionName === 'addManualInventoryRecord' || serverFunctionName === 'updateAssetTracking' || serverFunctionName === 'batchSync' || serverFunctionName === 'createTurnover' || serverFunctionName === 'respondToTurnover' || serverFunctionName === 'cancelTurnover') {
+            requestBody.sessionId = effectiveSessionId;
+            let rawPayload = args[1];
+            if (typeof rawPayload === 'string' && (rawPayload.startsWith('{') || rawPayload.startsWith('['))) {
+              try { rawPayload = JSON.parse(rawPayload); } catch (e) {}
+            }
+            requestBody.payload = rawPayload;
+          } else {
+            requestBody.sessionId = effectiveSessionId;
+            requestBody.payload = args[1];
+          }
+          return requestBody;
+        };
+
+        const executeFetchPost = (targetUrl, overrideSessionId, isRetry) => {
+          const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+          const timeoutMs = (serverFunctionName === 'processRawDataUpload' || serverFunctionName === 'updateAssetTracking' || serverFunctionName === 'batchSync' || serverFunctionName === 'getDriveInventoryData' || serverFunctionName === 'getDriveSemiExpendableData') ? 60000 : 35000;
+          const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+          const reqData = buildRequestBody(overrideSessionId);
+
+          fetch(targetUrl, {
+            method: 'POST',
+            mode: 'cors',
+            credentials: 'omit',
+            redirect: 'follow',
+            cache: 'no-store',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(reqData),
+            signal: controller ? controller.signal : undefined
+          })
+          .then(res => {
+            if (timeoutId) clearTimeout(timeoutId);
+            if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + res.statusText);
+            return res.json();
+          })
+          .then(async data => {
+            // Auto-refresh session once if server rejected unbridged/expired session
+            const errCode = (data && data.code) || (data && data.data && data.data.code) || '';
+            if (!isRetry && serverFunctionName !== 'login' && serverFunctionName !== 'validateSession' &&
+                data && data.success === false &&
+                (errCode === 'SESSION_NOT_FOUND' || errCode === 'SESSION_EXPIRED' || errCode === 'SESSION_INVALID' || errCode === 'NO_SESSION')) {
+              if (window.PEMS_SYNC && typeof window.PEMS_SYNC.ensureOnlineSession === 'function') {
+                const refreshedSessionId = await window.PEMS_SYNC.ensureOnlineSession(true);
+                if (refreshedSessionId) {
+                  executeFetchPost(targetUrl, refreshedSessionId, true);
+                  return;
+                }
+              }
+            }
+
+            // Cache real server data for offline use
+            if (data && data.success && window.localStorage) {
+              try {
+                if (serverFunctionName === 'getUsers' && data.data && Array.isArray(data.data.users)) {
+                  localStorage.setItem('pems_real_users_cache', JSON.stringify(data.data.users));
+                } else if (serverFunctionName === 'getTurnovers' && data.data) {
+                  localStorage.setItem('pems_real_turnovers_cache', JSON.stringify(data.data));
+                } else if (serverFunctionName === 'getTurnoverEligibleUsers' && data.data && Array.isArray(data.data.users)) {
+                  localStorage.setItem('pems_real_eligible_users_cache', JSON.stringify(data.data.users));
+                } else if (serverFunctionName === 'getDashboardStats' && data.data) {
+                  localStorage.setItem('pems_real_stats_cache', JSON.stringify(data.data));
+                }
+              } catch (cacheErr) {}
+            }
+
+            resolve(data);
+          })
+          .catch(fetchErr => {
+            if (timeoutId) clearTimeout(timeoutId);
+            console.warn('[PEMS API] Fetch failed (' + serverFunctionName + '):', fetchErr);
+
+            // Fallback retry using defaultApiUrl if custom targetUrl failed
+            if (!isRetry && defaultApiUrl && targetUrl !== defaultApiUrl) {
+              console.log('[PEMS API] Retrying with default API URL fallback...');
+              executeFetchPost(defaultApiUrl, overrideSessionId, true);
+              return;
+            }
+
+            if (isStrictNetworkAction) {
+              reject(fetchErr);
+              return;
+            }
+            if (isOnlineWriteAction) {
+              resolve({
+                success: false,
+                message: navigator.onLine
+                  ? ('Could not reach the PEMS server (' + (fetchErr.message || 'Network timeout') + '). Please try again.')
+                  : 'You are currently offline. This action requires an internet connection to update the database.'
+              });
+              return;
+            }
+            apiContext.localMock(serverFunctionName, args, resolve, reject);
+          });
+        };
+
+        // PATH A: Google Apps Script Container Mode (Inside Google Sheet / Sandboxed Iframe)
+        // Must be checked FIRST before fetch(apiUrl) so iframe does not get cross-origin fetch errors!
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
           try {
             const runner = google.script.run
               .withSuccessHandler(res => {
@@ -18853,7 +19062,12 @@ var PEMS = {
                 resolve(res);
               })
               .withFailureHandler(err => {
-                console.error('Server error executing "' + serverFunctionName + '":', err);
+                console.warn('Execution failure on google.script.run[' + serverFunctionName + ']:', err);
+                if (apiUrl) {
+                  // Fallback to Web API if runner failed
+                  executeFetchPost(apiUrl, null, false);
+                  return;
+                }
                 if (isStrictNetworkAction) {
                   reject(err);
                   return;
@@ -18861,27 +19075,39 @@ var PEMS = {
                 apiContext.localMock(serverFunctionName, args, resolve, reject);
               });
 
-            if (runner && typeof runner[serverFunctionName] === 'function') {
+            if (runner && typeof runner.invokeWebApiFromClient === 'function') {
+              runner.invokeWebApiFromClient(buildRequestBody());
+            } else if (runner && typeof runner[serverFunctionName] === 'function') {
               runner[serverFunctionName](...args);
+            } else if (apiUrl) {
+              executeFetchPost(apiUrl, null, false);
             } else {
-              console.warn(
-                'Notice: Server function "' + serverFunctionName + '" is not available on google.script.run proxy.\n' +
-                'Relying on local data handler to keep the interface interactive.'
-              );
               apiContext.localMock(serverFunctionName, args, resolve, reject);
             }
+            return;
           } catch (invErr) {
-            console.warn('Execution error on google.script.run[' + serverFunctionName + ']:', invErr);
+            console.warn('Execution error on google.script.run wrapper:', invErr);
+            if (apiUrl) {
+              executeFetchPost(apiUrl, null, false);
+              return;
+            }
             if (isStrictNetworkAction) {
               reject(invErr);
               return;
             }
             apiContext.localMock(serverFunctionName, args, resolve, reject);
+            return;
           }
-        } else {
-          // PATH C: Standalone preview or local development harness
-          apiContext.localMock(serverFunctionName, args, resolve, reject);
         }
+
+        // PATH B: Standalone Web App / GitHub Pages (fetch via Google Apps Script Web API)
+        if (apiUrl) {
+          executeFetchPost(apiUrl, null, false);
+          return;
+        }
+
+        // PATH C: Standalone preview or local development harness
+        apiContext.localMock(serverFunctionName, args, resolve, reject);
       });
     },
 

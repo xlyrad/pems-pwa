@@ -43,13 +43,15 @@
         if (window.PEMS && window.PEMS.notification) {
           window.PEMS.notification.info('Online Detected', 'Network connection restored. Auto-syncing gathered offline data...');
         }
-        // Immediate trigger + debounced retry after mobile radio stabilizes
-        this.triggerSync('network_reconnected');
+        // Debounce by 1200ms to allow mobile cellular / Wi-Fi DNS socket to stabilize
+        setTimeout(() => {
+          this.triggerSync('network_reconnected');
+        }, 1200);
         setTimeout(() => {
           if (!this.state.isSyncing && (this.state.pendingCount > 0 || this.state.failedCount > 0)) {
             this.triggerSync('network_reconnected_retry');
           }
-        }, 2500);
+        }, 4500);
       });
 
       window.addEventListener('offline', () => {
@@ -158,35 +160,48 @@
       }
 
       const apiUrl = (window.PEMS_CONFIG && window.PEMS_CONFIG.getApiUrl) ? window.PEMS_CONFIG.getApiUrl() : '';
-      if (!apiUrl) {
+      const defaultApiUrl = (window.PEMS_CONFIG && window.PEMS_CONFIG.DEFAULT_API_URL) ? window.PEMS_CONFIG.DEFAULT_API_URL : '';
+      const targetUrl = apiUrl || defaultApiUrl;
+      if (!targetUrl) {
         this.state.serverReachable = false;
         return false;
       }
 
-      try {
+      const probe = async (url) => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 7000);
-
-        // Ping backend using POST to eliminate CORS preflight issues
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'ping' }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const json = await response.json().catch(() => null);
-          // Even if an older backend deployment returns UNKNOWN_ACTION for 'ping',
-          // a valid JSON response from script.google.com proves the backend is reachable.
-          this.state.serverReachable = Boolean(json && typeof json === 'object');
-          return this.state.serverReachable;
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            mode: 'cors',
+            credentials: 'omit',
+            redirect: 'follow',
+            cache: 'no-store',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'ping' }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          if (response.ok) {
+            const json = await response.json().catch(() => null);
+            return Boolean(json && typeof json === 'object');
+          }
+          return false;
+        } catch (e) {
+          clearTimeout(timeoutId);
+          return false;
         }
-        this.state.serverReachable = false;
-        return false;
+      };
+
+      try {
+        let isReachable = await probe(targetUrl);
+        if (!isReachable && defaultApiUrl && targetUrl !== defaultApiUrl) {
+          isReachable = await probe(defaultApiUrl);
+        }
+        this.state.serverReachable = isReachable;
+        return isReachable;
       } catch (err) {
-        console.warn('[PEMS Sync] Connectivity check failed (offline or unreachable):', err.message);
+        console.warn('[PEMS Sync] Connectivity check error:', err);
         this.state.serverReachable = false;
         return false;
       }
@@ -569,21 +584,70 @@
         }
       }
 
-      // Execute via PEMS.api.invoke
+      // Convert inline data URLs into file upload objects and strip raw data URLs from payload
+      if (typeof payload.existingEquipmentPhoto === 'string' && payload.existingEquipmentPhoto.startsWith('data:')) {
+        if (!payload.equipmentPhotoFile && payload.existingEquipmentPhoto.indexOf(';base64,') !== -1) {
+          const parts = payload.existingEquipmentPhoto.split(';base64,');
+          payload.equipmentPhotoFile = {
+            base64: parts[1],
+            mimeType: parts[0].replace('data:', '') || 'image/jpeg',
+            fileName: ((payload.propNo || payload.propertyNo || 'photo').replace(/[^a-zA-Z0-9_-]/g, '_')) + '.jpg'
+          };
+        }
+        payload.existingEquipmentPhoto = '';
+      }
+      if (typeof payload.existingUploadFets === 'string' && payload.existingUploadFets.startsWith('data:')) {
+        if (!payload.fetsFile && payload.existingUploadFets.indexOf(';base64,') !== -1) {
+          const parts = payload.existingUploadFets.split(';base64,');
+          payload.fetsFile = {
+            base64: parts[1],
+            mimeType: parts[0].replace('data:', '') || 'application/pdf',
+            fileName: 'FETS_' + ((payload.propNo || payload.propertyNo || 'fets').replace(/[^a-zA-Z0-9_-]/g, '_')) + '.pdf'
+          };
+        }
+        payload.existingUploadFets = '';
+      }
+      if (typeof payload.existingUploadTransmittal === 'string' && payload.existingUploadTransmittal.startsWith('data:')) {
+        if (!payload.transmittalFile && payload.existingUploadTransmittal.indexOf(';base64,') !== -1) {
+          const parts = payload.existingUploadTransmittal.split(';base64,');
+          payload.transmittalFile = {
+            base64: parts[1],
+            mimeType: parts[0].replace('data:', '') || 'application/pdf',
+            fileName: 'TRANSMITTAL_' + ((payload.propNo || payload.propertyNo || 'transmittal').replace(/[^a-zA-Z0-9_-]/g, '_')) + '.pdf'
+          };
+        }
+        payload.existingUploadTransmittal = '';
+      }
+
+      // Execute via PEMS.api.invoke with automatic 1-time retry for transient network errors
       if (window.PEMS && window.PEMS.api && typeof window.PEMS.api.invoke === 'function') {
         const sess = window.PEMS.session ? window.PEMS.session.get() : null;
         const sessionId = sess ? sess.sessionId : null;
 
-        if (action === 'ADD_MANUAL_INVENTORY' || action === 'addManualInventoryRecord') {
-          return window.PEMS.api.addManualInventoryRecord(payload);
-        } else if (action === 'UPDATE_ASSET_TRACKING' || action === 'updateAssetTracking') {
-          return window.PEMS.api.updateAssetTracking(payload);
-        } else if (action === 'DELETE_INVENTORY_RECORD' || action === 'deleteInventoryRecord') {
-          return window.PEMS.api.deleteInventoryRecord(payload.propertyNo || payload.propNo);
-        } else if (action === 'PROCESS_RAW_DATA_UPLOAD' || action === 'processRawDataUpload') {
-          return window.PEMS.api.processRawDataUpload(payload);
-        } else {
-          return window.PEMS.api.invoke(action, sessionId, payload);
+        const invokeCall = async () => {
+          if (action === 'ADD_MANUAL_INVENTORY' || action === 'addManualInventoryRecord') {
+            return window.PEMS.api.addManualInventoryRecord(payload);
+          } else if (action === 'UPDATE_ASSET_TRACKING' || action === 'updateAssetTracking') {
+            return window.PEMS.api.updateAssetTracking(payload);
+          } else if (action === 'DELETE_INVENTORY_RECORD' || action === 'deleteInventoryRecord') {
+            return window.PEMS.api.deleteInventoryRecord(payload.propertyNo || payload.propNo);
+          } else if (action === 'PROCESS_RAW_DATA_UPLOAD' || action === 'processRawDataUpload') {
+            return window.PEMS.api.processRawDataUpload(payload);
+          } else {
+            return window.PEMS.api.invoke(action, sessionId, payload);
+          }
+        };
+
+        try {
+          return await invokeCall();
+        } catch (callErr) {
+          const msg = String(callErr && callErr.message || '');
+          if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('AbortError')) {
+            console.log('[PEMS Sync] Transient network error, retrying mutation in 1500ms...');
+            await new Promise(r => setTimeout(r, 1500));
+            return await invokeCall();
+          }
+          throw callErr;
         }
       }
 
@@ -727,7 +791,17 @@
           ? window.PEMS.users.escapeHtml.bind(window.PEMS.users)
           : (s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
 
-        let html = '<div class="sync-queue-items-list">';
+        let html = `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;padding:0 0.25rem;">
+            <button type="button" class="btn btn-xs btn-primary" onclick="window.PEMS_SYNC.triggerSync('drawer_manual')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg> Sync All Now
+            </button>
+            <button type="button" class="btn btn-xs btn-outline" style="color:var(--text-muted);" onclick="window.PEMS_SYNC.clearAllQueue()">
+              Clear Queue
+            </button>
+          </div>
+          <div class="sync-queue-items-list">
+        `;
         mutations.forEach(item => {
           const statusClass = item.status === 'failed' ? 'status-err' : (item.status === 'syncing' ? 'status-syncing' : 'status-pending');
           const statusLabel = item.status === 'failed' ? 'Waiting for Retry' : (item.status === 'syncing' ? 'Syncing...' : 'Pending Sync');
@@ -739,7 +813,10 @@
             <div class="sync-queue-card ${statusClass}">
               <div class="sync-card-header">
                 <span class="sync-card-prop font-mono">${esc(propNo)}</span>
-                <span class="sync-card-status ${statusClass}">${statusLabel}</span>
+                <div style="display:flex;align-items:center;gap:0.4rem;">
+                  <span class="sync-card-status ${statusClass}">${statusLabel}</span>
+                  <button type="button" class="btn btn-xs btn-outline" style="padding:1px 5px;font-size:11px;min-height:unset;line-height:1;" onclick="window.PEMS_SYNC.removeQueueItem(${item.id})" title="Remove item from queue">✕</button>
+                </div>
               </div>
               <div class="sync-card-body font-mono text-xs">
                 <div>Action: <strong>${esc(actionLabel)}</strong></div>
@@ -756,6 +833,29 @@
         if (container) {
           container.innerHTML = `<div style="padding: 2rem; color: #ef4444;">Failed to load sync queue: ${err.message}</div>`;
         }
+      }
+    },
+
+    async removeQueueItem(id) {
+      if (!window.PEMS_DB) return;
+      try {
+        await window.PEMS_DB.removeMutation(id);
+        await this.refreshQueueStats();
+        this.openSyncDrawer();
+      } catch (e) {
+        console.warn('Could not remove item:', e);
+      }
+    },
+
+    async clearAllQueue() {
+      if (!window.PEMS_DB) return;
+      if (!confirm('Are you sure you want to clear all offline items in the synchronization queue?')) return;
+      try {
+        await window.PEMS_DB.clearSyncQueue();
+        await this.refreshQueueStats();
+        this.openSyncDrawer();
+      } catch (e) {
+        console.warn('Could not clear queue:', e);
       }
     },
 

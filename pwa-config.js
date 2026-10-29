@@ -31,7 +31,11 @@
       try {
         const stored = localStorage.getItem(this.API_URL_STORAGE_KEY);
         if (stored && stored.trim().startsWith('http')) {
-          return stored.trim();
+          const trimmed = stored.trim();
+          // Skip invalid /dev test endpoints that break CORS
+          if (!trimmed.endsWith('/dev')) {
+            return trimmed;
+          }
         }
       } catch (e) {}
 
@@ -79,10 +83,14 @@
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
 
         const res = await fetch(url, {
           method: 'POST',
+          mode: 'cors',
+          credentials: 'omit',
+          redirect: 'follow',
+          cache: 'no-store',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ action: 'ping' }),
           signal: controller.signal
@@ -91,11 +99,11 @@
 
         if (res.ok) {
           const json = await res.json().catch(() => null);
-          if (json && (json.success || json.code === 'UNKNOWN_ACTION')) {
+          if (json && (json.success || json.code === 'UNKNOWN_ACTION' || json.status === 'ONLINE')) {
             return {
               success: true,
-              message: `Connected successfully to PEMS API (${json.data && json.data.version ? json.data.version : 'Online'}).`,
-              data: json.data
+              message: `Connected successfully to PEMS API (${(json.data && json.data.version) || json.version || 'Online'}).`,
+              data: json.data || json
             };
           }
           return {
@@ -111,7 +119,7 @@
         return {
           success: false,
           message: err.name === 'AbortError'
-            ? 'Connection timed out after 8s. Check network connectivity and script permissions.'
+            ? 'Connection timed out after 15s. Check network connectivity and script permissions.'
             : `Network error: ${err.message}. Ensure Web App is deployed with access set to "Anyone".`
         };
       }

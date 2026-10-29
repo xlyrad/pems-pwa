@@ -5,7 +5,7 @@
  * ============================================================================
  */
 
-const CACHE_NAME = 'pems-cache-v1.2.0';
+const CACHE_NAME = 'pems-cache-v1.3.0';
 const OFFLINE_URL = './';
 
 const STATIC_ASSETS = [

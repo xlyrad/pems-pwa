@@ -18818,12 +18818,47 @@ var PEMS = {
 
         // PATH B: Standard Apps Script container (google.script.run)
         if (typeof google !== 'undefined' && google.script && google.script.run) {
+          const strictNetworkActions = [
+            'addManualInventoryRecord',
+            'updateAssetTracking',
+            'deleteInventoryRecord',
+            'processRawDataUpload',
+            'batchSync',
+            'getDriveInventoryData',
+            'getDriveSemiExpendableData'
+          ];
+          const isStrictNetworkAction = strictNetworkActions.indexOf(serverFunctionName) !== -1;
+
+          if (!navigator.onLine && isStrictNetworkAction) {
+            reject(new Error('Device is currently in offline mode.'));
+            return;
+          }
+
           try {
             const runner = google.script.run
-              .withSuccessHandler(res => resolve(res))
+              .withSuccessHandler(res => {
+                if (res && res.success && window.localStorage) {
+                  try {
+                    if (serverFunctionName === 'getUsers' && res.data && Array.isArray(res.data.users)) {
+                      localStorage.setItem('pems_real_users_cache', JSON.stringify(res.data.users));
+                    } else if (serverFunctionName === 'getTurnovers' && res.data) {
+                      localStorage.setItem('pems_real_turnovers_cache', JSON.stringify(res.data));
+                    } else if (serverFunctionName === 'getTurnoverEligibleUsers' && res.data && Array.isArray(res.data.users)) {
+                      localStorage.setItem('pems_real_eligible_users_cache', JSON.stringify(res.data.users));
+                    } else if (serverFunctionName === 'getDashboardStats' && res.data) {
+                      localStorage.setItem('pems_real_stats_cache', JSON.stringify(res.data));
+                    }
+                  } catch (e) {}
+                }
+                resolve(res);
+              })
               .withFailureHandler(err => {
                 console.error('Server error executing "' + serverFunctionName + '":', err);
-                reject(err);
+                if (isStrictNetworkAction) {
+                  reject(err);
+                  return;
+                }
+                apiContext.localMock(serverFunctionName, args, resolve, reject);
               });
 
             if (runner && typeof runner[serverFunctionName] === 'function') {
@@ -18837,6 +18872,10 @@ var PEMS = {
             }
           } catch (invErr) {
             console.warn('Execution error on google.script.run[' + serverFunctionName + ']:', invErr);
+            if (isStrictNetworkAction) {
+              reject(invErr);
+              return;
+            }
             apiContext.localMock(serverFunctionName, args, resolve, reject);
           }
         } else {

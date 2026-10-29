@@ -1,20 +1,14 @@
 /**
  * ============================================================================
- * PEMS PWA — SERVICE WORKER (Offline-First App Shell Caching)
+ * PEMS PWA SERVICE WORKER — FULL OFFLINE SUPPORT (MOBILE & TABLET)
  * File: sw.js
  * ============================================================================
- * Caches core application shell, styles, scripts, fonts, and assets for
- * instant offline loading, including when reopened while disconnected.
- *
- * Strategies:
- * 1. App Shell & Static Assets: Stale-While-Revalidate / Cache-First
- * 2. Google Apps Script API: Network-Only (IndexedDB handles offline persistence)
- * 3. Offline Navigation Fallback: Serves cached index.html
  */
 
-const CACHE_NAME = 'pems-pwa-v1.0.1';
+const CACHE_NAME = 'pems-cache-v1.2.0';
+const OFFLINE_URL = './';
 
-const PRECACHE_ASSETS = [
+const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
@@ -23,133 +17,135 @@ const PRECACHE_ASSETS = [
   './js/sync.js',
   './js/pwa-install.js',
   './js/jsQR.js',
-  './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable.png',
+  './icons/icon.svg',
+  'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap',
   'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
-  'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap'
+  'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'
 ];
 
-// 1. Service Worker Installation
+// 1. INSTALL EVENT — Cache core App Shell
 self.addEventListener('install', (event) => {
-  console.log('[PEMS SW] Installing service worker & caching app shell...');
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      // Use cache.addAll with fault-tolerance so one missing remote resource doesn't abort install
-      return Promise.allSettled(
-        PRECACHE_ASSETS.map((url) => {
-          return cache.add(url).catch((err) => {
-            console.warn('[PEMS SW] Precache warning for', url, err);
-          });
-        })
-      );
-    }).then(() => {
-      console.log('[PEMS SW] App shell precached successfully.');
-      return self.skipWaiting();
+    caches.open(CACHE_NAME).then(async (cache) => {
+      console.log('[PEMS SW] Pre-caching static app shell...');
+      for (const asset of STATIC_ASSETS) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn('[PEMS SW] Failed pre-caching asset:', asset, err);
+        }
+      }
     })
   );
 });
 
-// 2. Service Worker Activation & Cache Cleanup
+// 2. ACTIVATE EVENT — Clean obsolete caches & take control
 self.addEventListener('activate', (event) => {
-  console.log('[PEMS SW] Activating service worker...');
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.map((name) => {
-          if (name !== CACHE_NAME) {
-            console.log('[PEMS SW] Removing obsolete cache:', name);
-            return caches.delete(name);
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            console.log('[PEMS SW] Deleting obsolete cache:', key);
+            return caches.delete(key);
           }
         })
       );
-    }).then(() => {
-      console.log('[PEMS SW] Claiming clients for instant offline control.');
-      return self.clients.claim();
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
-// 3. Network Request Interception & Caching Strategies
+// 3. FETCH EVENT — Stale-While-Revalidate for app, Network-Only for APIs
 self.addEventListener('fetch', (event) => {
-  const request = event.request;
-  const url = new URL(request.url);
+  const req = event.request;
+  const url = new URL(req.url);
 
-  // A. Never cache POST requests or Google Apps Script API calls in SW
-  // (IndexedDB handles offline API queueing and mutation persistence)
-  if (
-    request.method !== 'GET' ||
-    url.hostname.includes('script.google.com') ||
-    url.hostname.includes('script.googleusercontent.com')
-  ) {
-    return; // Pass through to network
+  // A. Non-GET requests (e.g. POST to Google Apps Script Web App API)
+  // MUST NEVER be cached by the service worker
+  if (req.method !== 'GET') {
+    return;
   }
 
-  // B. Navigation requests (HTML pages) -> Stale-While-Revalidate with offline fallback
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      caches.match('./index.html').then((cachedResponse) => {
-        const fetchPromise = fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put('./index.html', responseClone);
-            });
-          }
-          return networkResponse;
-        }).catch(() => {
-          // Network failed, return cached response
-          return cachedResponse;
-        });
+  // B. Google Apps Script Web App execution URLs
+  if (url.hostname.includes('script.google.com') || url.hostname.includes('script.googleusercontent.com')) {
+    return;
+  }
 
-        // Return cached page immediately if available, else wait for network
-        return cachedResponse || fetchPromise;
+  // C. HTML Navigation Requests (Loading the app in browser / standalone PWA)
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then((networkRes) => {
+          if (networkRes && networkRes.status === 200) {
+            const clone = networkRes.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+          }
+          return networkRes;
+        })
+        .catch(async () => {
+          console.log('[PEMS SW] Offline navigation; serving cached app shell.');
+          const cached = await caches.match(req, { ignoreSearch: true });
+          if (cached) return cached;
+          const indexCached = await caches.match('./index.html', { ignoreSearch: true });
+          if (indexCached) return indexCached;
+          const fallback = await caches.match(OFFLINE_URL, { ignoreSearch: true });
+          if (fallback) return fallback;
+          return new Response('Offline: PEMS App Shell is loading from local storage.', {
+            headers: { 'Content-Type': 'text/html;charset=utf-8' }
+          });
+        })
+    );
+    return;
+  }
+
+  // D. Google Fonts & External CDNs (Cache-First with Network fallback)
+  if (url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com') || url.hostname.includes('cdnjs.cloudflare.com') || url.hostname.includes('cdn.jsdelivr.net')) {
+    event.respondWith(
+      caches.match(req, { ignoreSearch: true }).then((cached) => {
+        if (cached) return cached;
+        return fetch(req).then((res) => {
+          if (res && res.status === 200) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+          }
+          return res;
+        }).catch(() => cached);
       })
     );
     return;
   }
 
-  // C. Static Assets & Fonts -> Stale-While-Revalidate
+  // E. Static Assets (Icons, Images, Scripts) — Stale-While-Revalidate
   event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Fetch background update to keep cache fresh
-        fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, networkResponse);
-            });
-          }
-        }).catch(() => {});
-        return cachedResponse;
-      }
-
-      // Not in cache: fetch from network and cache
-      return fetch(request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type === 'opaque') {
-          return networkResponse;
+    caches.match(req, { ignoreSearch: true }).then((cached) => {
+      const fetchPromise = fetch(req).then((networkRes) => {
+        if (networkRes && networkRes.status === 200) {
+          const clone = networkRes.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
         }
+        return networkRes;
+      }).catch(() => null);
 
-        const responseClone = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, responseClone);
-        });
-        return networkResponse;
-      }).catch((err) => {
-        // Fallback for image requests when offline
-        if (request.destination === 'image') {
-          return caches.match('./icons/icon-192.png');
-        }
-        throw err;
-      });
+      return cached || fetchPromise;
     })
   );
 });
 
-// 4. Background Sync & Message Handling
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.action === 'skipWaiting') {
-    self.skipWaiting();
+// 4. BACKGROUND SYNC EVENT (Supported in Android Chrome / Edge)
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'pems-sync-queue') {
+    console.log('[PEMS SW] Background sync event triggered:', event.tag);
+    event.waitUntil(
+      self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: 'PEMS_AUTO_SYNC_TRIGGER' });
+        });
+      })
+    );
   }
 });
+

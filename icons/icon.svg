@@ -1,56 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <radialGradient id="bgG" cx="50%" cy="50%" r="75%">
-      <stop offset="0%" stop-color="#1e293b"/>
-      <stop offset="100%" stop-color="#070c18"/>
-    </radialGradient>
-    <linearGradient id="gIndigo" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#818cf8"/>
-      <stop offset="100%" stop-color="#4f46e5"/>
+    <linearGradient id="pemsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
     </linearGradient>
-    <linearGradient id="gCyan" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#38bdf8"/>
-      <stop offset="100%" stop-color="#0284c7"/>
-    </linearGradient>
-    <linearGradient id="gPink" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f472b6"/>
-      <stop offset="100%" stop-color="#db2777"/>
-    </linearGradient>
-    <linearGradient id="gEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#34d399"/>
-      <stop offset="100%" stop-color="#059669"/>
-    </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="16" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
   </defs>
-
-  <!-- Background -->
-  <rect width="512" height="512" rx="112" fill="url(#bgG)"/>
-  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="rgba(56, 189, 248, 0.2)" stroke-width="4"/>
-
-  <!-- Glowing Aura -->
-  <circle cx="256" cy="240" r="140" fill="url(#gCyan)" opacity="0.15" filter="url(#glow)"/>
-
-  <!-- 3D Isometric Cube / Asset Diamond -->
-  <g filter="url(#glow)" transform="translate(0, -10)">
-    <!-- Top Face -->
-    <polygon points="256,90 380,160 256,230 132,160" fill="url(#gIndigo)" stroke="#c7d2fe" stroke-width="3"/>
-    <!-- Left Face -->
-    <polygon points="132,160 256,230 256,370 132,300" fill="url(#gCyan)" stroke="#bae6fd" stroke-width="3"/>
-    <!-- Right Face -->
-    <polygon points="256,230 380,160 380,300 256,370" fill="url(#gPink)" stroke="#fbcfe8" stroke-width="3"/>
-
-    <!-- Inner Core Nexus -->
-    <circle cx="256" cy="230" r="28" fill="url(#gEmerald)" stroke="#ffffff" stroke-width="3"/>
-    <path d="M246,230 l7,7 l15,-14" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
-
-  <!-- Title Badge -->
-  <rect x="146" y="410" width="220" height="42" rx="21" fill="rgba(15, 23, 42, 0.85)" stroke="rgba(56, 189, 248, 0.4)" stroke-width="2"/>
-  <text x="256" y="438" fill="#f8fafc" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="20" font-weight="800" letter-spacing="4" text-anchor="middle">PEMS PWA</text>
+  <rect width="512" height="512" rx="110" fill="#0b1329"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="url(#pemsGrad)" stroke-width="4" opacity="0.4"/>
+  <path d="M256 90 L390 140 V260 C390 350 256 420 256 420 C256 420 122 350 122 260 V140 Z" fill="url(#pemsGrad)" opacity="0.95"/>
+  <path d="M256 160 L330 195 V255 C330 310 256 360 256 360 C256 360 182 310 182 255 V195 Z" fill="#060b18"/>
+  <path d="M220 260 L245 285 L295 230" fill="none" stroke="#38bdf8" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

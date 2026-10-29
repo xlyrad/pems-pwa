@@ -95,6 +95,122 @@
       });
     },
 
+    /**
+     * Converts a 20-column array or partial record object into a normalized record object.
+     * @param {Array|Object} rec
+     * @param {string} [defaultSyncStatus='synced']
+     * @returns {Object|null}
+     */
+    rowToRecord(rec, defaultSyncStatus = 'synced') {
+      if (!rec) return null;
+      if (Array.isArray(rec)) {
+        const pNo = String(rec[1] || '').trim().toUpperCase();
+        if (!pNo) return null;
+        const rowValues = [];
+        for (let i = 0; i < 20; i++) {
+          rowValues.push(rec[i] !== undefined && rec[i] !== null ? String(rec[i]) : '');
+        }
+        return {
+          propertyNo: pNo,
+          articleDesc: rowValues[0],
+          generalDesc: rowValues[2],
+          serialNo: rowValues[3],
+          acquisitionCost: rowValues[4],
+          acquisitionDate: rowValues[5],
+          parNo: rowValues[6],
+          officeName: rowValues[7],
+          receiver: rowValues[8],
+          subPar: rowValues[9],
+          dateUpload: rowValues[10],
+          uploadedBy: rowValues[11],
+          equipmentPhoto: rowValues[12],
+          fetsNo: rowValues[13],
+          fetsTo: rowValues[14],
+          uploadFets: rowValues[15],
+          transmittalDate: rowValues[16],
+          uploadTransmittal: rowValues[17],
+          remarks: rowValues[18],
+          status: rowValues[19],
+          rowValues: rowValues,
+          syncStatus: defaultSyncStatus,
+          clientUpdatedAt: new Date().toISOString()
+        };
+      }
+
+      const pNo = String(rec.propertyNo || (rec.rowValues && rec.rowValues[1]) || '').trim().toUpperCase();
+      if (!pNo) return null;
+
+      const rv = Array.isArray(rec.rowValues) && rec.rowValues.length >= 20 ? rec.rowValues.slice(0, 20) : null;
+      const articleDesc = String(rec.articleDesc ?? (rv ? rv[0] : '') ?? '');
+      const generalDesc = String(rec.generalDesc ?? (rv ? rv[2] : '') ?? '');
+      const serialNo = String(rec.serialNo ?? (rv ? rv[3] : '') ?? '');
+      const acquisitionCost = String(rec.acquisitionCost ?? (rv ? rv[4] : '') ?? '');
+      const acquisitionDate = String(rec.acquisitionDate ?? rec.acqDate ?? (rv ? rv[5] : '') ?? '');
+      const parNo = String(rec.parNo ?? (rv ? rv[6] : '') ?? '');
+      const officeName = String(rec.officeName ?? rec.office ?? (rv ? rv[7] : '') ?? '');
+      const receiver = String(rec.receiver ?? (rv ? rv[8] : '') ?? '');
+      const subPar = String(rec.subPar ?? (rv ? rv[9] : '') ?? '');
+      const dateUpload = String(rec.dateUpload ?? (rv ? rv[10] : '') ?? '');
+      const uploadedBy = String(rec.uploadedBy ?? (rv ? rv[11] : '') ?? '');
+      const equipmentPhoto = String(rec.equipmentPhoto ?? (rv ? rv[12] : '') ?? '');
+      const fetsNo = String(rec.fetsNo ?? (rv ? rv[13] : '') ?? '');
+      const fetsTo = String(rec.fetsTo ?? (rv ? rv[14] : '') ?? '');
+      const uploadFets = String(rec.uploadFets ?? (rv ? rv[15] : '') ?? '');
+      const transmittalDate = String(rec.transmittalDate ?? (rv ? rv[16] : '') ?? '');
+      const uploadTransmittal = String(rec.uploadTransmittal ?? (rv ? rv[17] : '') ?? '');
+      const remarks = String(rec.remarks ?? (rv ? rv[18] : '') ?? '');
+      const status = String(rec.status ?? (rv ? rv[19] : '') ?? '');
+
+      const normalizedRowValues = [
+        articleDesc,
+        pNo,
+        generalDesc,
+        serialNo,
+        acquisitionCost,
+        acquisitionDate,
+        parNo,
+        officeName,
+        receiver,
+        subPar,
+        dateUpload,
+        uploadedBy,
+        equipmentPhoto,
+        fetsNo,
+        fetsTo,
+        uploadFets,
+        transmittalDate,
+        uploadTransmittal,
+        remarks,
+        status
+      ];
+
+      return Object.assign({}, rec, {
+        propertyNo: pNo,
+        articleDesc: articleDesc,
+        generalDesc: generalDesc,
+        serialNo: serialNo,
+        acquisitionCost: acquisitionCost,
+        acquisitionDate: acquisitionDate,
+        parNo: parNo,
+        officeName: officeName,
+        receiver: receiver,
+        subPar: subPar,
+        dateUpload: dateUpload,
+        uploadedBy: uploadedBy,
+        equipmentPhoto: equipmentPhoto,
+        fetsNo: fetsNo,
+        fetsTo: fetsTo,
+        uploadFets: uploadFets,
+        transmittalDate: transmittalDate,
+        uploadTransmittal: uploadTransmittal,
+        remarks: remarks,
+        status: status,
+        rowValues: normalizedRowValues,
+        syncStatus: rec.syncStatus || defaultSyncStatus,
+        clientUpdatedAt: rec.clientUpdatedAt || new Date().toISOString()
+      });
+    },
+
     // =========================================================================
     // RECORDS STORE METHODS
     // =========================================================================
@@ -104,17 +220,15 @@
      */
     saveRecord(record) {
       if (!record) return Promise.reject(new Error('Record is required'));
-      const pNo = String(record.propertyNo || (record.rowValues && record.rowValues[1]) || '').trim().toUpperCase();
-      if (!pNo) return Promise.reject(new Error('Property No is required'));
+      const normalized = this.rowToRecord(record, record.syncStatus || 'synced');
+      if (!normalized || !normalized.propertyNo) {
+        return Promise.reject(new Error('Property No is required'));
+      }
 
-      record.propertyNo = pNo;
-      record.clientUpdatedAt = record.clientUpdatedAt || new Date().toISOString();
-      record.syncStatus = record.syncStatus || 'synced'; // 'synced' | 'pending' | 'failed'
-
-      return this._getTransaction('records', 'readwrite').then(({ store, tx }) => {
+      return this._getTransaction('records', 'readwrite').then(({ store }) => {
         return new Promise((resolve, reject) => {
-          const req = store.put(record);
-          req.onsuccess = () => resolve(record);
+          const req = store.put(normalized);
+          req.onsuccess = () => resolve(normalized);
           req.onerror = () => reject(req.error);
         });
       });
@@ -166,25 +280,44 @@
     },
 
     /**
-     * Bulk saves an array of records in a single transaction.
+     * Bulk saves an array of records (either 20-col arrays or record objects) in a single transaction.
+     * Preserves any local records that currently have syncStatus === 'pending' or 'failed'.
      */
-    saveRecordsBatch(records) {
+    saveRecordsBatch(records, headers) {
       if (!Array.isArray(records) || records.length === 0) return Promise.resolve(0);
+
+      if (Array.isArray(headers) && headers.length > 0) {
+        this.setMeta('inventoryHeaders', headers).catch(() => {});
+      }
 
       return this._getTransaction('records', 'readwrite').then(({ store, tx }) => {
         return new Promise((resolve, reject) => {
-          let count = 0;
-          records.forEach(rec => {
-            const pNo = String(rec.propertyNo || (rec.rowValues && rec.rowValues[1]) || '').trim().toUpperCase();
-            if (pNo) {
-              rec.propertyNo = pNo;
-              rec.clientUpdatedAt = rec.clientUpdatedAt || new Date().toISOString();
-              rec.syncStatus = rec.syncStatus || 'synced';
-              store.put(rec);
-              count++;
-            }
-          });
-          tx.oncomplete = () => resolve(count);
+          const getAllReq = store.getAll();
+          getAllReq.onsuccess = () => {
+            const existingList = getAllReq.result || [];
+            const unsyncedMap = {};
+            existingList.forEach(item => {
+              if (item && item.propertyNo && (item.syncStatus === 'pending' || item.syncStatus === 'failed')) {
+                unsyncedMap[String(item.propertyNo).trim().toUpperCase()] = item;
+              }
+            });
+
+            let count = 0;
+            records.forEach(rec => {
+              const normalized = this.rowToRecord(rec, 'synced');
+              if (normalized && normalized.propertyNo) {
+                // Do not overwrite pending/failed offline edits with stale server data
+                if (unsyncedMap[normalized.propertyNo] && (!rec || Array.isArray(rec) || rec.syncStatus !== 'pending')) {
+                  return;
+                }
+                store.put(normalized);
+                count++;
+              }
+            });
+
+            tx.oncomplete = () => resolve(count);
+          };
+          getAllReq.onerror = () => reject(getAllReq.error);
           tx.onerror = () => reject(tx.error);
         });
       });
@@ -272,12 +405,25 @@
 
     /**
      * Enqueues an offline mutation into the sync queue.
-     * @param {string} action E.g. 'ADD_MANUAL_INVENTORY', 'UPDATE_ASSET_TRACKING', 'DELETE_INVENTORY_RECORD'
-     * @param {Object} payload The mutation payload
+     * Supports both single-object argument and positional arguments.
+     * @param {string|Object} actionOrObj E.g. 'ADD_MANUAL_INVENTORY', 'UPDATE_ASSET_TRACKING', or config object
+     * @param {Object} [payload] The mutation payload
      * @param {string} [idempotencyKey] Unique idempotency key (UUID)
      * @param {string} [photoKey] Optional key linking to photo store
      */
-    enqueueMutation(action, payload, idempotencyKey, photoKey = null) {
+    enqueueMutation(actionOrObj, payload, idempotencyKey, photoKey = null) {
+      let action = actionOrObj;
+      let pKeys = [];
+      if (actionOrObj && typeof actionOrObj === 'object') {
+        action = actionOrObj.action;
+        payload = actionOrObj.payload;
+        idempotencyKey = actionOrObj.idempotencyKey;
+        photoKey = actionOrObj.photoKey || null;
+        pKeys = actionOrObj.photoKeys || (photoKey ? [photoKey] : []);
+      } else if (photoKey) {
+        pKeys = [photoKey];
+      }
+
       const key = idempotencyKey || ('idem_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9));
 
       const mutation = {
@@ -285,6 +431,7 @@
         payload: payload,
         idempotencyKey: key,
         photoKey: photoKey,
+        photoKeys: pKeys,
         status: 'pending', // 'pending' | 'syncing' | 'failed'
         retries: 0,
         lastError: null,
@@ -297,6 +444,17 @@
           const req = store.add(mutation);
           req.onsuccess = () => {
             mutation.id = req.result;
+            // Register OS-level Background Sync if supported (Android / Chrome PWA)
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.ready.then(reg => {
+                if (reg && reg.sync && typeof reg.sync.register === 'function') {
+                  reg.sync.register('pems-sync-queue').catch(() => {});
+                }
+              }).catch(() => {});
+            }
+            if (window.PEMS_SYNC && typeof window.PEMS_SYNC.refreshQueueStats === 'function') {
+              window.PEMS_SYNC.refreshQueueStats();
+            }
             resolve(mutation);
           };
           req.onerror = () => reject(req.error);
@@ -313,7 +471,7 @@
           const req = store.getAll();
           req.onsuccess = () => {
             const all = req.result || [];
-            const pending = all.filter(item => item.status === 'pending' || item.status === 'failed');
+            const pending = all.filter(item => item.status === 'pending' || item.status === 'failed' || item.status === 'syncing');
             // Sort by createdAt ascending
             pending.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
             resolve(pending);
@@ -365,6 +523,33 @@
           const req = store.delete(id);
           req.onsuccess = () => resolve(true);
           req.onerror = () => reject(req.error);
+        });
+      });
+    },
+
+    /**
+     * Clears completed/synced (or failed if no synced) mutations from the queue.
+     */
+    clearCompletedMutations() {
+      return this._getTransaction('syncQueue', 'readwrite').then(({ store, tx }) => {
+        return new Promise((resolve, reject) => {
+          const req = store.getAll();
+          req.onsuccess = () => {
+            const all = req.result || [];
+            all.forEach(item => {
+              if (item.status === 'synced' || item.status === 'completed') {
+                store.delete(item.id);
+              }
+            });
+            tx.oncomplete = () => {
+              if (window.PEMS_SYNC && typeof window.PEMS_SYNC.refreshQueueStats === 'function') {
+                window.PEMS_SYNC.refreshQueueStats();
+              }
+              resolve(true);
+            };
+          };
+          req.onerror = () => reject(req.error);
+          tx.onerror = () => reject(tx.error);
         });
       });
     },

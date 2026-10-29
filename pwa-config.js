@@ -81,20 +81,20 @@
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-        const pingUrl = url + (url.indexOf('?') !== -1 ? '&' : '?') + 'action=ping&_t=' + Date.now();
-        const res = await fetch(pingUrl, {
-          method: 'GET',
-          mode: 'cors',
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'ping' }),
           signal: controller.signal
         });
         clearTimeout(timeoutId);
 
         if (res.ok) {
           const json = await res.json().catch(() => null);
-          if (json && json.success) {
+          if (json && (json.success || json.code === 'UNKNOWN_ACTION')) {
             return {
               success: true,
-              message: `Connected successfully to PEMS API (${json.data ? json.data.version : 'Online'}).`,
+              message: `Connected successfully to PEMS API (${json.data && json.data.version ? json.data.version : 'Online'}).`,
               data: json.data
             };
           }

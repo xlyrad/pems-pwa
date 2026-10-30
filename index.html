@@ -11,6 +11,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PEMS PWA" />
 
+  <!-- Apple Touch & PWA App Icons (iOS Safari, iPadOS, Android, Desktop) -->
+  <link rel="apple-touch-icon" href="./icons/icon.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="./icons/icon-512.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png" />
+  <link rel="icon" type="image/png" href="./icons/icon.png" />
+
   <!-- PWA Manifest & Service Worker Registration (Conditionally loaded for Standalone PWA, suppressed in GAS iframe to eliminate 404s) -->
   <script>
     (function() {
@@ -23,8 +31,14 @@
 
         var linkTouchIcon = document.createElement('link');
         linkTouchIcon.rel = 'apple-touch-icon';
-        linkTouchIcon.href = './icons/icon-192.png';
+        linkTouchIcon.href = './icons/icon.png';
         document.head.appendChild(linkTouchIcon);
+
+        var linkPngIcon = document.createElement('link');
+        linkPngIcon.rel = 'icon';
+        linkPngIcon.type = 'image/png';
+        linkPngIcon.href = './icons/icon.png';
+        document.head.appendChild(linkPngIcon);
 
         var linkSvgIcon = document.createElement('link');
         linkSvgIcon.rel = 'icon';

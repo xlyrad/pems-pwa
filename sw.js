@@ -5,7 +5,7 @@
  * ============================================================================
  */
 
-const CACHE_NAME = 'pems-cache-v1.3.0';
+const CACHE_NAME = 'pems-cache-v1.4.0';
 const OFFLINE_URL = './';
 
 const STATIC_ASSETS = [
@@ -17,6 +17,7 @@ const STATIC_ASSETS = [
   './js/sync.js',
   './js/pwa-install.js',
   './js/jsQR.js',
+  './icons/icon.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable.png',
